@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = ["lesson2/build-cfg"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0"
+
+[workspace.dependencies]
+bril-rs = { git = "https://github.com/sampsyo/bril", features = [
+    "memory",
+    "float",
+    "ssa",
+    "speculate",
+    "position",
+    "import",
+    "char",
+] }
+slotmap = "1.0.7"
+snafu = "0.8.5"
+argh = "0.1.13"
+serde_json = "1.0.137"
+owo-colors = "4.1.0"
+inform = { version = "0.3.3", features = ["io"] }
