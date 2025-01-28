@@ -8,7 +8,7 @@ the GitHub terms of service, including those that are granted to:
 2. Other users <https://docs.github.com/en/site-policy/github-terms/github-terms-of-service#5-license-grant-to-other-users>
 
 In other words, you MAY NOT use this work in this repository for your classwork.
-You are only granted (by GitHub):
+Doing so is ILLEGAL and punishable by LAW. You are only granted (by GitHub):
 
     a nonexclusive, worldwide license to use, display, and perform Your Content
     through the GitHub Service and to reproduce Your Content solely on GitHub 
