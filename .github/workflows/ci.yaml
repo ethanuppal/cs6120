@@ -46,4 +46,4 @@ jobs:
           cd lesson2
           python3 test/check_equivalence.py \
           ../bril/benchmarks/**/*.bril \
-            --exclude ../../bril/benchmarks/float/cordic.bril
+            --exclude ../bril/benchmarks/float/cordic.bril
