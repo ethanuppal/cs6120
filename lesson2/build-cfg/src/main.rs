@@ -2,41 +2,149 @@
 //
 // Please see the LICENSE file in the project root directory.
 
-use std::{fs, io, io::Write, path::PathBuf};
+use std::{
+    fs,
+    io::{self, Write},
+    path::PathBuf,
+    str::FromStr,
+};
 
 use argh::FromArgs;
-use bril_rs::Program;
+use bril_rs::{EffectOps, Instruction, Program};
 use build_cfg::{build_cfg, Exit};
 use inform::{common::IndentWriterCommon, io::IndentWriter};
 use owo_colors::OwoColorize;
 use snafu::{ResultExt, Whatever};
 
+enum Mode {
+    Passthrough,
+    Pretty,
+}
+
+impl FromStr for Mode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "passthrough" => Ok(Self::Passthrough),
+            "pretty" => Ok(Self::Pretty),
+            other => Err(format!("Unknown printing mode '{}'", other)),
+        }
+    }
+}
+
 /// Extracts the control-flow graph from a Bril program.
 #[derive(FromArgs)]
 struct Opts {
+    /// type of printing
+    #[argh(option)]
+    mode: Mode,
+
     /// input Bril file: omit for stdin
     #[argh(positional)]
     input: Option<PathBuf>,
 }
 
-#[snafu::report]
-fn main() -> Result<(), Whatever> {
-    let opts = argh::from_env::<Opts>();
+fn print_reconstructed(program: Program) -> Result<(), Whatever> {
+    for import in program.imports {
+        println!("{}", import);
+    }
 
-    let program: Program = if let Some(path) = opts.input {
-        let contents = fs::read_to_string(&path).whatever_context(format!(
-            "Failed to read the contents of {}",
-            path.to_string_lossy()
+    for function in &program.functions {
+        let cfg = build_cfg(function).whatever_context(format!(
+            "Failed to build control-flow graph for function `{}`",
+            function.name
         ))?;
-        serde_json::from_str(&contents).whatever_context(
-            "Failed to parse input file as a valid Bril program",
-        )?
-    } else {
-        serde_json::from_reader(io::stdin()).whatever_context(
-            "Failed to parse standard input as a valid Bril program",
-        )?
-    };
 
+        println!(
+            "@{}({}){} {{",
+            cfg.signature.name,
+            cfg.signature
+                .arguments
+                .iter()
+                .map(|argument| argument.to_string())
+                .collect::<Vec<_>>()
+                .join(", "),
+            if let Some(return_type) = cfg.signature.return_type {
+                format!(": {}", return_type)
+            } else {
+                "".into()
+            }
+        );
+        for (block_index, block) in &cfg.vertices {
+            if let Some(label) = &block.label {
+                println!(".{}:", label.name);
+            }
+            for instruction in &block.instructions {
+                println!("  {}", instruction);
+            }
+            if let Some(exit) = cfg.edges.get(block_index) {
+                match exit {
+                    Exit::Unconditional(destination) => {
+                        let destination_label = cfg.vertices[*destination]
+                            .label
+                            .as_ref()
+                            .expect("jumped without label");
+                        println!(
+                            "  {}",
+                            Instruction::Effect {
+                                args: vec![],
+                                funcs: vec![],
+                                labels: vec![destination_label.name.clone()],
+                                op: EffectOps::Jump,
+                                pos: None
+                            }
+                        )
+                    }
+                    Exit::Conditional {
+                        condition,
+                        if_true,
+                        if_false,
+                    } => {
+                        let if_true_label = cfg.vertices[*if_true]
+                            .label
+                            .as_ref()
+                            .expect("branched without label");
+                        let if_false_label = cfg.vertices[*if_false]
+                            .label
+                            .as_ref()
+                            .expect("branched without label");
+                        println!(
+                            "  {}",
+                            Instruction::Effect {
+                                args: vec![condition.clone()],
+                                funcs: vec![],
+                                labels: vec![
+                                    if_true_label.name.clone(),
+                                    if_false_label.name.clone()
+                                ],
+                                op: EffectOps::Branch,
+                                pos: None
+                            }
+                        )
+                    }
+                    Exit::Return(value) => {
+                        println!(
+                            "  {}",
+                            Instruction::Effect {
+                                args: value.iter().cloned().collect(),
+                                funcs: vec![],
+                                labels: vec![],
+                                op: EffectOps::Return,
+                                pos: None
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        println!("}}");
+    }
+
+    Ok(())
+}
+
+fn print_pretty(program: Program) -> Result<(), Whatever> {
     let mut stdout = io::stdout();
     let mut f = IndentWriter::new(&mut stdout, 4);
 
@@ -178,6 +286,32 @@ fn main() -> Result<(), Whatever> {
         f.decrease_indent();
         writeln!(f, "}}\n").whatever_context("Writing to stdout failed")?;
     }
+
+    Ok(())
+}
+
+#[snafu::report]
+fn main() -> Result<(), Whatever> {
+    let opts = argh::from_env::<Opts>();
+
+    let program: Program = if let Some(path) = opts.input {
+        let contents = fs::read_to_string(&path).whatever_context(format!(
+            "Failed to read the contents of {}",
+            path.to_string_lossy()
+        ))?;
+        serde_json::from_str(&contents).whatever_context(
+            "Failed to parse input file as a valid Bril program",
+        )?
+    } else {
+        serde_json::from_reader(io::stdin()).whatever_context(
+            "Failed to parse standard input as a valid Bril program",
+        )?
+    };
+
+    match opts.mode {
+        Mode::Passthrough => print_reconstructed(program)?,
+        Mode::Pretty => print_pretty(program)?,
+    };
 
     Ok(())
 }

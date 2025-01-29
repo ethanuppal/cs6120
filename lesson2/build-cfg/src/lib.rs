@@ -4,7 +4,9 @@
 
 use std::{collections::HashMap, mem};
 
-use bril_rs::{Code, EffectOps, Function, Instruction, Position};
+use bril_rs::{
+    Argument, Code, EffectOps, Function, Instruction, Position, Type,
+};
 use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 use snafu::{whatever, OptionExt, Whatever};
 
@@ -56,21 +58,43 @@ pub enum Exit {
 }
 
 #[derive(Default)]
-pub struct ControlFlowGraph {
+pub struct FunctionSignature {
+    pub name: String,
+    pub arguments: Vec<Argument>,
+    pub return_type: Option<Type>,
+}
+
+#[derive(Default)]
+pub struct FunctionCfg {
+    pub signature: FunctionSignature,
     pub vertices: SlotMap<BasicBlockIdx, BasicBlock>,
     pub edges: SecondaryMap<BasicBlockIdx, Exit>,
 }
 
-#[derive(Default)]
-struct ControlFlowGraphBuilder {
-    cfg: ControlFlowGraph,
+struct FunctionCfgBuilder {
+    cfg: FunctionCfg,
     current_block: BasicBlock,
     labels_to_blocks: HashMap<String, BasicBlockIdx>,
 }
 
-impl ControlFlowGraphBuilder {
-    pub fn current_block_is_empty(&self) -> bool {
-        self.current_block.instructions.is_empty()
+impl FunctionCfgBuilder {
+    pub fn new(
+        name: String,
+        arguments: Vec<Argument>,
+        return_type: Option<Type>,
+    ) -> Self {
+        Self {
+            cfg: FunctionCfg {
+                signature: FunctionSignature {
+                    name,
+                    arguments,
+                    return_type,
+                },
+                ..Default::default()
+            },
+            current_block: BasicBlock::default(),
+            labels_to_blocks: HashMap::default(),
+        }
     }
 
     pub fn add_to_current(&mut self, instruction: Instruction) {
@@ -98,7 +122,7 @@ impl ControlFlowGraphBuilder {
         }
     }
 
-    pub fn finish(mut self) -> Result<ControlFlowGraph, Whatever> {
+    pub fn finish(mut self) -> Result<FunctionCfg, Whatever> {
         for (block_idx, block) in &self.cfg.vertices {
             if let Some(exit) = &block.exit {
                 match exit {
@@ -165,17 +189,19 @@ fn pos_to_string(pos: Option<&Position>) -> String {
         .unwrap_or("<unknown>".into())
 }
 
-pub fn build_cfg(function: &Function) -> Result<ControlFlowGraph, Whatever> {
-    let mut builder = ControlFlowGraphBuilder::default();
+pub fn build_cfg(function: &Function) -> Result<FunctionCfg, Whatever> {
+    let mut builder = FunctionCfgBuilder::new(
+        function.name.clone(),
+        function.args.clone(),
+        function.return_type.clone(),
+    );
 
     builder.mark_current_as_entry();
 
     for instruction in &function.instrs {
         match instruction {
             Code::Label { label, .. } => {
-                if !builder.current_block_is_empty() {
-                    builder.finish_current_and_start_new_block();
-                }
+                builder.finish_current_and_start_new_block();
                 builder.set_current_label(label.clone());
             }
             Code::Instruction(instruction) => match instruction {
@@ -263,9 +289,9 @@ pub fn build_cfg(function: &Function) -> Result<ControlFlowGraph, Whatever> {
     }
 
     // for anything leftover
-    if !builder.current_block_is_empty() {
-        builder.finish_current_and_start_new_block();
-    }
+    //if !builder.current_block_is_empty() {
+    builder.finish_current_and_start_new_block();
+    //}
 
     builder.finish()
 }

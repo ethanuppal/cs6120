@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches:
+     - main
+  pull_request:
+    branches:
+     - main
+
+jobs:
+  lesson2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone Bril on the side
+        run: cd .. && git clone https://github.com/sampsyo/bril
+
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - uses: actions/setup-python@v4
+        with:
+            python-version: '3.11'
+            cache: pip
+            cache-dependency-path: ../bril/bril-txt/pyproject.toml
+
+      - name: Install Flit
+        run: pip install flit
+      - name: Install Python tools
+        run: cd ../bril/bril-txt ; flit install --symlink
+
+      - name: Install Turnt
+        # run: pip install turnt  # Use instead if pip turnt version >= 1.7
+        uses: actions/checkout@v4
+        with:
+          repository: cucapra/turnt
+          path: './turnt'
+      - name: Install Turnt part 2
+        run: cd turnt ; flit install --symlink
+
+      - name: Test build-cfg
+        run: |
+          cd lesson2
+          python3 test/check_equivalence.py \
+            ../../bril/benchmarks/**/*.bril \
+            --exclude ../../bril/benchmarks/float/cordic.bril
