@@ -14,3 +14,4 @@ tower-lsp = "0.20.0"
 bril-rs = { git = "https://github.com/sampsyo/bril" }
 brilirs = { git = "https://github.com/sampsyo/bril" }
 dashmap = "6.1.0"
+serde_json = "1.0.138"

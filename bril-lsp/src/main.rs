@@ -11,9 +11,10 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{fs, path::PathBuf, sync::Arc};
 
 use bril_rs::Program;
+use brilirs::{basic_block::BBProgram, check};
 use dashmap::DashMap;
 use tower_lsp::{
     jsonrpc, lsp_types::*, Client, LanguageServer, LspService, Server,
@@ -194,12 +195,17 @@ impl Backend {
         }
     }
 
-    async fn compile(&self, message: &str, path: String) {
-        let Ok(path) = PathBuf::from(&path).canonicalize() else {
+    async fn compile(
+        &self,
+        message: &'static str,
+        uri: Url,
+        version: Option<i32>,
+    ) {
+        let Ok(path) = PathBuf::from(uri.path()).canonicalize() else {
             self.client
                 .log_message(
                     MessageType::ERROR,
-                    format!("{}: failed to canonicalize {}", message, path),
+                    format!("{}: failed to canonicalize {}", message, uri),
                 )
                 .await;
             return;
@@ -212,7 +218,125 @@ impl Backend {
             )
             .await;
 
-        // TODO: compile
+        let contents = match fs::read_to_string(&path) {
+            Ok(contents) => contents,
+            Err(error) => {
+                self.client
+                    .publish_diagnostics(
+                        uri,
+                        vec![Diagnostic::new(
+                            Range::new(
+                                Position::new(0, 0),
+                                Position::new(0, 0),
+                            ),
+                            Some(DiagnosticSeverity::ERROR),
+                            None,
+                            None,
+                            format!(
+                                "Failed to open file {}: {}",
+                                path.to_string_lossy(),
+                                error
+                            ),
+                            None,
+                            None,
+                        )],
+                        version,
+                    )
+                    .await;
+                return;
+            }
+        };
+
+        let program: Program = match serde_json::from_str(&contents) {
+            Ok(program) => program,
+            Err(error) => {
+                let position = Position::new(
+                    error.line() as u32 - 1,
+                    error.column() as u32 - 1,
+                );
+                self.client
+                    .publish_diagnostics(
+                        uri,
+                        vec![Diagnostic::new(
+                            Range::new(position, position),
+                            Some(DiagnosticSeverity::ERROR),
+                            None,
+                            None,
+                            format!(
+                                "Failed to parse program {}: {}",
+                                path.to_string_lossy(),
+                                error
+                            ),
+                            None,
+                            None,
+                        )],
+                        version,
+                    )
+                    .await;
+                return;
+            }
+        };
+
+        // let basic_block_program = match BBProgram::new(program) {
+        //     Ok(basic_block_program) => basic_block_program,
+        //     Err(error) => {
+        //         self.client
+        //             .publish_diagnostics(
+        //                 uri,
+        //                 vec![Diagnostic::new(
+        //                     Range::new(
+        //                         Position::new(0, 0),
+        //                         Position::new(0, 0),
+        //                     ),
+        //                     Some(DiagnosticSeverity::ERROR),
+        //                     None,
+        //                     None,
+        //                     format!(
+        //                         "Failed to build basic block program from {}: {}",
+        //                         path.to_string_lossy(),
+        //                         error
+        //                     ),
+        //                     None,
+        //                     None,
+        //                 )],
+        //                 version
+        //             )
+        //             .await;
+        //         return;
+        //     }
+        // };
+
+        // if let Err(error) = check::type_check(&basic_block_program) {
+        //     let error_message = error.to_string();
+        //     let position = error
+        //         .pos
+        //         .as_ref()
+        //         .map(|pos| {
+        //             Position::new(
+        //                 pos.pos.row as u32 - 1,
+        //                 pos.pos.col as u32 - 1,
+        //             )
+        //         })
+        //         .unwrap_or(Position::new(0, 0));
+        //     self.client
+        //         .publish_diagnostics(
+        //             uri,
+        //             vec![Diagnostic::new(
+        //                 Range::new(position, position),
+        //                 Some(DiagnosticSeverity::ERROR),
+        //                 None,
+        //                 None,
+        //                 format!("Program failed to type check",),
+        //                 None,
+        //                 None,
+        //             )],
+        //             version,
+        //         )
+        //         .await;
+        //     return;
+        // }
+
+        self.files.insert(path, program);
     }
 }
 
@@ -239,17 +363,25 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        self.compile("did_open", params.text_document.uri.path().to_string())
-            .await;
+        self.compile(
+            "did_open",
+            params.text_document.uri,
+            Some(params.text_document.version),
+        )
+        .await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        self.compile("did_change", params.text_document.uri.path().to_string())
-            .await;
+        self.compile(
+            "did_change",
+            params.text_document.uri,
+            Some(params.text_document.version),
+        )
+        .await;
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
-        self.compile("did_save", params.text_document.uri.path().to_string())
+        self.compile("did_save", params.text_document.uri, None)
             .await;
     }
 
