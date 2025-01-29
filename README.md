@@ -16,3 +16,8 @@ Doing so is ILLEGAL and punishable by LAW. You are only granted (by GitHub):
 
 i.e., you can fork this project (although I strongly recommend not doing so).
 ```
+
+The exceptions to this license are as follows:
+
+- [bril-lsp](./bril-lsp/) is licensed under the GNU General Public License, 
+  Version 3.0.
