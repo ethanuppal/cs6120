@@ -13,8 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Clone Bril on the side
-        run: cd .. && git clone https://github.com/sampsyo/bril
+
+      - name: Clone Bril
+        run: git clone https://github.com/sampsyo/bril
 
       - uses: denoland/setup-deno@v1
         with:
@@ -24,12 +25,12 @@ jobs:
         with:
             python-version: '3.11'
             cache: pip
-            cache-dependency-path: /home/bril/bril-txt/pyproject.toml
+            cache-dependency-path: /bril/bril-txt/pyproject.toml
 
       - name: Install Flit
         run: pip install flit
       - name: Install Python tools
-        run: cd ../bril/bril-txt ; flit install --symlink
+        run: cd bril/bril-txt ; flit install --symlink
 
       - name: Install Turnt
         # run: pip install turnt  # Use instead if pip turnt version >= 1.7
@@ -44,5 +45,5 @@ jobs:
         run: |
           cd lesson2
           python3 test/check_equivalence.py \
-            ../../bril/benchmarks/**/*.bril \
+          ../bril/benchmarks/**/*.bril \
             --exclude ../../bril/benchmarks/float/cordic.bril
