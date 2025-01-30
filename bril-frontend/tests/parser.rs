@@ -40,10 +40,10 @@ macro_rules! parser_snapshot {
     };
 }
 
-//parser_snapshot! {
-//    add_bril_parses,
-//    include_str!("../bril-programs/add.bril")
-//}
+parser_snapshot! {
+    add_no_print_bril_parses,
+    include_str!("../bril-programs/add_no_print.bril")
+}
 
 parser_snapshot! {
     import_bril_parses,

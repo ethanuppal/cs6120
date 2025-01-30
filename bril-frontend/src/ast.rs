@@ -112,6 +112,7 @@ pub struct ValueOperation<'a> {
     pub type_annotation: Option<Loc<TypeAnnotation>>,
     pub equals_token: Loc<()>,
     pub op: Loc<ValueOperationOp<'a>>,
+    pub semi_token: Loc<()>,
 }
 
 pub enum EffectOperation<'a> {

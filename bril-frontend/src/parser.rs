@@ -65,9 +65,12 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
             .unwrap_or(0..0)
     }
 
-    pub fn get(&self, offset: usize) -> Option<&Loc<Token<'source>>> {
-        if self.index + offset < self.tokens.len() {
-            Some(&self.tokens[self.index + offset])
+    pub fn get(&self, offset: isize) -> Option<&Loc<Token<'source>>> {
+        let get_index = ((self.index as isize) + offset) as usize;
+        if !(offset < 0 && (-offset) as usize > self.index)
+            && get_index < self.tokens.len()
+        {
+            Some(&self.tokens[get_index])
         } else {
             None
         }
@@ -351,13 +354,72 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         .between(start, end))
     }
 
+    pub fn parse_value_operation_op(
+        &mut self,
+        op_name: Loc<&'source str>,
+    ) -> Result<Loc<ast::ValueOperationOp<'source>>> {
+        macro_rules! try_op {
+            (@parse_argument; $self:ident; Identifier) => {
+                $self.try_eat(Token::Identifier(""))?.map(Token::assume_identifier)
+            };
+            ($self:ident; $op_name:ident:$name:literal => $enum:ident::$variant:ident($($token_name:ident as Token::$token:ident $(end:$span:ident)?),*)) => {
+                if let Some((op, end)) = (|| -> Option<($crate::ast::$enum, $crate::loc::Span)> {
+                    #[allow(unused_assignments)]
+                    let mut end = $op_name.span();
+                    $(
+                        let $token_name = try_op!(@parse_argument; $self; $token);
+                        $(end = $token_name.$span();)*
+                    )*
+                    Some((
+                        $crate::ast::$enum::$variant($($token_name),*),
+                        end
+                    ))
+                })() {
+                    return Ok(op.between($op_name, end))
+                }
+            };
+        }
+
+        try_op!(self; op_name: "add" => ValueOperationOp::Add(lhs as Token::Identifier, rhs as Token::Identifier end:span));
+        try_op!(self; op_name: "mul" => ValueOperationOp::Mul(lhs as Token::Identifier, rhs as Token::Identifier end:span));
+        try_op!(self; op_name: "sub" => ValueOperationOp::Sub(lhs as Token::Identifier, rhs as Token::Identifier end:span));
+        try_op!(self; op_name: "div" => ValueOperationOp::Div(lhs as Token::Identifier, rhs as Token::Identifier end:span));
+        try_op!(self; op_name: "eq" => ValueOperationOp::Eq(lhs as Token::Identifier, rhs as Token::Identifier end:span));
+        try_op!(self; op_name: "gt" => ValueOperationOp::Gt(lhs as Token::Identifier, rhs as Token::Identifier end:span));
+        try_op!(self; op_name: "le" => ValueOperationOp::Le(lhs as Token::Identifier, rhs as Token::Identifier end:span));
+        try_op!(self; op_name: "ge" => ValueOperationOp::Ge(lhs as Token::Identifier, rhs as Token::Identifier end:span));
+        try_op!(self; op_name: "not" => ValueOperationOp::Not(value as Token::Identifier end:span));
+        try_op!(self; op_name: "and" => ValueOperationOp::And(lhs as Token::Identifier, rhs as Token::Identifier end:span));
+        try_op!(self; op_name: "or" => ValueOperationOp::Or(lhs as Token::Identifier, rhs as Token::Identifier end:span));
+        try_op!(self; op_name: "id" => ValueOperationOp::Id(value as Token::Identifier end:span));
+
+        Err(())
+    }
+
     pub fn parse_value_operation(
         &mut self,
         name: Loc<&'source str>,
         type_annotation: Option<Loc<ast::TypeAnnotation>>,
         equals_token: Loc<()>,
+        op_name: Loc<&'source str>,
     ) -> Result<Loc<ast::ValueOperation<'source>>> {
-        todo!()
+        let op = self.parse_value_operation_op(op_name)?;
+        let semi_token = self
+            .eat(
+                Token::Semi,
+                "Expected semicolon at end of value operation instruction",
+            )?
+            .without_inner();
+        let start = name.span();
+        let end = semi_token.span();
+        Ok(ast::ValueOperation {
+            name,
+            type_annotation,
+            equals_token,
+            op,
+            semi_token,
+        }
+        .between(start, end))
     }
 
     pub fn parse_effect_operation(
@@ -413,6 +475,7 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
                     name,
                     type_annotation,
                     equals_token,
+                    instruction_name,
                 )?;
                 let span = value_operation.span();
                 Ok(ast::Instruction::ValueOperation(value_operation).at(span))

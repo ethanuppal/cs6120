@@ -123,6 +123,66 @@ impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
         writeln!(self.w, ";")
     }
 
+    pub fn print_value_operation_op(
+        &mut self,
+        value_operation_op: &ast::ValueOperationOp,
+    ) -> fmt::Result {
+        match value_operation_op {
+            ast::ValueOperationOp::Add(lhs, rhs) => {
+                write!(self.w, "add {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Mul(lhs, rhs) => {
+                write!(self.w, "mul {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Sub(lhs, rhs) => {
+                write!(self.w, "sub {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Div(lhs, rhs) => {
+                write!(self.w, "div {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Eq(lhs, rhs) => {
+                write!(self.w, "eq {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Lt(lhs, rhs) => {
+                write!(self.w, "lt {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Gt(lhs, rhs) => {
+                write!(self.w, "gt {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Le(lhs, rhs) => {
+                write!(self.w, "le {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Ge(lhs, rhs) => {
+                write!(self.w, "ge {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Not(value) => {
+                write!(self.w, "not {}", value)
+            }
+            ast::ValueOperationOp::And(lhs, rhs) => {
+                write!(self.w, "and {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Or(lhs, rhs) => {
+                write!(self.w, "or {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Id(value) => {
+                write!(self.w, "id {}", value)
+            }
+        }
+    }
+
+    pub fn print_value_operation(
+        &mut self,
+        value_operation: &ast::ValueOperation,
+    ) -> fmt::Result {
+        write!(self.w, "{}", value_operation.name)?;
+        if let Some(type_annotation) = &value_operation.type_annotation {
+            self.print_type_annotation(type_annotation)?;
+        }
+        write!(self.w, " = ")?;
+        self.print_value_operation_op(&value_operation.op)?;
+        writeln!(self.w, ";")
+    }
+
     pub fn print_instruction(
         &mut self,
         instruction: &ast::Instruction,
@@ -131,7 +191,9 @@ impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
             ast::Instruction::Constant(constant) => {
                 self.print_constant(constant)
             }
-            ast::Instruction::ValueOperation(loc) => todo!(),
+            ast::Instruction::ValueOperation(value_operation) => {
+                self.print_value_operation(value_operation)
+            }
             ast::Instruction::EffectOperation(loc) => todo!(),
         }
     }
