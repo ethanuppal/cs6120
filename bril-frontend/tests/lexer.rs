@@ -1,6 +1,4 @@
 use bril_frontend::{lexer::Token, loc::Loc};
-use insta::assert_debug_snapshot;
-use logos::Logos;
 
 #[allow(dead_code)] // since Debug
 #[derive(Debug)]
@@ -22,8 +20,11 @@ macro_rules! lexer_snapshot {
     ($name:ident, $code:expr) => {
         #[test]
         fn $name() {
+            use insta::assert_debug_snapshot;
+            use logos::Logos;
+
             let code = $code;
-            let mut lexer = Token::lexer(code);
+            let mut lexer = bril_frontend::lexer::Token::lexer(code);
             let mut tokens = vec![];
             while let Some(next) = lexer.next() {
                 if let Ok(token) = next {
@@ -42,8 +43,11 @@ macro_rules! lexer_error {
     ($name:ident, $code:expr) => {
         #[test]
         fn $name() {
+            use insta::assert_debug_snapshot;
+            use logos::Logos;
+
             let code = $code;
-            let mut lexer = Token::lexer(code);
+            let mut lexer = bril_frontend::lexer::Token::lexer(code);
             let mut tokens = vec![];
             while let Some(next) = lexer.next() {
                 if let Ok(token) = next {
@@ -80,6 +84,11 @@ lexer_snapshot! {
 lexer_snapshot! {
     import_bril_lexes,
     include_str!("../bril-programs/import.bril")
+}
+
+lexer_snapshot! {
+    simple_bril_lexes,
+    include_str!("../bril-programs/simple.bril")
 }
 
 lexer_error! {

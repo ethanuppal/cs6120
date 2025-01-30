@@ -66,7 +66,7 @@ impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
             }
             self.print_imported_function(imported_function)?;
         }
-        writeln!(self.w)?;
+        writeln!(self.w, ";")?;
 
         Ok(())
     }
