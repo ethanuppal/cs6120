@@ -68,22 +68,24 @@ pub struct TypeAnnotation {
 }
 
 pub enum Instruction<'a> {
-    Constant(Constant<'a>),
-    Value(ValueOperation<'a>),
-    Effect(EffectOperation<'a>),
+    Constant(Loc<Constant<'a>>),
+    ValueOperation(Loc<ValueOperation<'a>>),
+    EffectOperation(Loc<EffectOperation<'a>>),
 }
 
 pub enum ConstantValue {
-    IntLiteral(Loc<i64>),
+    IntegerLiteral(Loc<i64>),
     FloatLiteral(Loc<f64>),
-    CharLiteral(Loc<char>),
+    CharacterLiteral(Loc<char>),
 }
 
 pub struct Constant<'a> {
     pub name: Loc<&'a str>,
     pub type_annotation: Option<Loc<TypeAnnotation>>,
     pub equals_token: Loc<()>,
+    pub const_token: Loc<()>,
     pub value: Loc<ConstantValue>,
+    pub semi_token: Loc<()>,
 }
 
 pub enum ValueOperationOp<'a> {

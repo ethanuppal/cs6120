@@ -40,6 +40,7 @@ pub struct Parser<'tokens, 'source: 'tokens> {
 
 pub type Result<T> = std::result::Result<T, ()>;
 
+#[allow(clippy::result_unit_err)]
 impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
     pub fn new(tokens: &'tokens [Loc<Token<'source>>]) -> Self {
         Self {
@@ -291,10 +292,136 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         Ok(ast::Label { name }.at(span))
     }
 
+    pub fn parse_constant_value(&mut self) -> Result<Loc<ast::ConstantValue>> {
+        if let Some(integer) = self.try_eat(Token::Integer(0)) {
+            let span = integer.span();
+            Ok(ast::ConstantValue::IntegerLiteral(
+                integer.map(Token::assume_integer),
+            )
+            .at(span))
+        } else if let Some(float) = self.try_eat(Token::Float(0.0)) {
+            let span = float.span();
+            Ok(
+                ast::ConstantValue::FloatLiteral(
+                    float.map(Token::assume_float),
+                )
+                .at(span),
+            )
+        } else if let Some(character) = self.try_eat(Token::Character(' ')) {
+            let span = character.span();
+            Ok(ast::ConstantValue::CharacterLiteral(
+                character.map(Token::assume_character),
+            )
+            .at(span))
+        } else {
+            self.diagnostics.push(Diagnostic::new(
+                "Unknown constant value: expected integer, float, or character",
+                self.get(0)
+                    .map(|token| token.span())
+                    .unwrap_or(self.eof_span()),
+            ));
+            Err(())
+        }
+    }
+
+    pub fn parse_constant(
+        &mut self,
+        name: Loc<&'source str>,
+        type_annotation: Option<Loc<ast::TypeAnnotation>>,
+        equals_token: Loc<()>,
+        const_token: Loc<()>,
+    ) -> Result<Loc<ast::Constant<'source>>> {
+        let value = self.parse_constant_value()?;
+        let semi_token = self
+            .eat(
+                Token::Semi,
+                "Expected semicolon at end of constant instruction",
+            )?
+            .without_inner();
+        let start = name.span();
+        let end = semi_token.span();
+        Ok(ast::Constant {
+            name,
+            type_annotation,
+            equals_token,
+            const_token,
+            value,
+            semi_token,
+        }
+        .between(start, end))
+    }
+
+    pub fn parse_value_operation(
+        &mut self,
+        name: Loc<&'source str>,
+        type_annotation: Option<Loc<ast::TypeAnnotation>>,
+        equals_token: Loc<()>,
+    ) -> Result<Loc<ast::ValueOperation<'source>>> {
+        todo!()
+    }
+
+    pub fn parse_effect_operation(
+        &mut self,
+    ) -> Result<Loc<ast::EffectOperation<'source>>> {
+        todo!()
+    }
+
     pub fn parse_instruction(
         &mut self,
     ) -> Result<Loc<ast::Instruction<'source>>> {
-        todo!()
+        let is_not_effect_operation = self
+            .get(1)
+            .map(|token| {
+                token.matches_against(Token::Colon)
+                    || token.matches_against(Token::Equals)
+            })
+            .unwrap_or(false);
+
+        if is_not_effect_operation {
+            let name = self
+                .eat(
+                    Token::Identifier(""),
+                    "Expected destination variable name in instruction",
+                )?
+                .map(Token::assume_identifier);
+
+            let type_annotation = if self.is_at(&Token::Colon) {
+                Some(self.parse_type_annotation()?)
+            } else {
+                None
+            };
+
+            let equals_token = self
+                .eat(Token::Equals, "Missing = after variable")?
+                .without_inner();
+
+            let instruction_name = self
+                .eat(Token::Identifier(""), "Missing instruction name")?
+                .map(Token::assume_identifier);
+
+            if instruction_name.inner == "const" {
+                let constant = self.parse_constant(
+                    name,
+                    type_annotation,
+                    equals_token,
+                    instruction_name.without_inner(),
+                )?;
+                let span = constant.span();
+                Ok(ast::Instruction::Constant(constant).at(span))
+            } else {
+                let value_operation = self.parse_value_operation(
+                    name,
+                    type_annotation,
+                    equals_token,
+                )?;
+                let span = value_operation.span();
+                Ok(ast::Instruction::ValueOperation(value_operation).at(span))
+            }
+        } else {
+            let effect_operation = self.parse_effect_operation()?;
+            let span = effect_operation.span();
+            Ok(ast::Instruction::EffectOperation(effect_operation).at(span))
+        }
     }
 
     pub fn parse_function_code(
@@ -348,10 +475,7 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         &mut self,
     ) -> Result<Loc<ast::TypeAnnotation>> {
         let colon_token = self
-            .eat(
-                Token::Colon,
-                format!("Need colon before type in type annotation"),
-            )?
+            .eat(Token::Colon, "Need colon before type in type annotation")?
             .without_inner();
         let ty = self.parse_type()?;
         let start = colon_token.span();

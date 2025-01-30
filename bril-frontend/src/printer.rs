@@ -96,11 +96,44 @@ impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
         write!(self.w, "{}", label.name)
     }
 
+    pub fn print_constant_value(
+        &mut self,
+        constant_value: &ast::ConstantValue,
+    ) -> fmt::Result {
+        match constant_value {
+            ast::ConstantValue::IntegerLiteral(integer) => {
+                write!(self.w, "{}", integer)
+            }
+            ast::ConstantValue::FloatLiteral(float) => {
+                write!(self.w, "{}", float)
+            }
+            ast::ConstantValue::CharacterLiteral(character) => {
+                write!(self.w, "{}", character)
+            }
+        }
+    }
+
+    pub fn print_constant(&mut self, constant: &ast::Constant) -> fmt::Result {
+        write!(self.w, "{}", constant.name)?;
+        if let Some(type_annotation) = &constant.type_annotation {
+            self.print_type_annotation(type_annotation)?;
+        }
+        write!(self.w, " = const ")?;
+        self.print_constant_value(&constant.value)?;
+        writeln!(self.w, ";")
+    }
+
     pub fn print_instruction(
         &mut self,
         instruction: &ast::Instruction,
     ) -> fmt::Result {
-        todo!()
+        match instruction {
+            ast::Instruction::Constant(constant) => {
+                self.print_constant(constant)
+            }
+            ast::Instruction::ValueOperation(loc) => todo!(),
+            ast::Instruction::EffectOperation(loc) => todo!(),
+        }
     }
 
     pub fn print_function_code(

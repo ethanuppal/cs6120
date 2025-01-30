@@ -62,7 +62,7 @@ pub enum Token<'a> {
     #[token("=")]
     Equals,
 
-    #[regex("[1-9][0-9]*", |lexer| lexer.slice().parse().ok())]
+    #[regex("[0-9][0-9]*", |lexer| lexer.slice().parse().ok())]
     Integer(i64),
     #[regex(r"[0-9][0-9]*\.[0-9][0-9]*", |lexer| lexer.slice().parse().ok())]
     Float(f64),
@@ -150,6 +150,27 @@ impl<'a> Token<'a> {
             panic!("Expected path");
         };
         path
+    }
+
+    pub fn assume_integer(self) -> i64 {
+        let Self::Integer(integer) = self else {
+            panic!("Expected integer");
+        };
+        integer
+    }
+
+    pub fn assume_float(self) -> f64 {
+        let Self::Float(float) = self else {
+            panic!("Expected float");
+        };
+        float
+    }
+
+    pub fn assume_character(self) -> char {
+        let Self::Character(character) = self else {
+            panic!("Expected character");
+        };
+        character
     }
 }
 
