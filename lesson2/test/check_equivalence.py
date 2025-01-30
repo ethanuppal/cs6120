@@ -77,16 +77,13 @@ if __name__ == "__main__":
             initializer=init_worker,
             initargs=(shared_event,),
         ) as pool:
-            try:
-                pool.imap_unordered(
-                    check_file,
-                    [(executable, transformer, filename) for filename in filenames],
-                )
-                pool.close()
-                pool.join()
-                if shared_event.is_set():
-                    print("Some tests failed!")
-                    pool.terminate()
-                    sys.exit(1)
-            except:
-                pass
+            pool.imap_unordered(
+                check_file,
+                [(executable, transformer, filename) for filename in filenames],
+            )
+            pool.close()
+            pool.join()
+            if shared_event.is_set():
+                print("Some tests failed!")
+                pool.terminate()
+                sys.exit(1)
