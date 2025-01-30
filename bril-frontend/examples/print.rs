@@ -56,10 +56,14 @@ fn main() -> Result<(), Whatever> {
         let renderer = Renderer::styled();
         for diagnostic in parser.diagnostics() {
             let mut message = Level::Error.title(&diagnostic.message);
-            if let Some((text, span)) = &diagnostic.label {
+            for (text, span) in &diagnostic.labels {
                 message = message.snippet(
                     Snippet::source(&code).origin(&file).fold(true).annotation(
-                        Level::Error.span(span.clone()).label(text.as_str()),
+                        Level::Error
+                            .span(
+                                span.clone().unwrap_or(diagnostic.span.clone()),
+                            )
+                            .label(text.as_str()),
                     ),
                 );
             }

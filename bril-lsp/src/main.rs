@@ -11,11 +11,20 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
-use bril_rs::Program;
-//use brilirs::{basic_block::BBProgram, check};
+use bril_frontend::{
+    ast::{Instruction, Type},
+    lexer::Token,
+    loc::{Loc, Span, Spanned},
+    parser::Parser,
+};
 use dashmap::DashMap;
+use logos::Logos;
 use tower_lsp::{
     jsonrpc, lsp_types::*, Client, LanguageServer, LspService, Server,
 };
@@ -179,28 +188,92 @@ pub fn get_builtin_completions() -> [CompletionItem; BUILTIN_COMPLETIONS_LENGTH]
         .unwrap()
 }
 
+#[derive(Debug, Clone)]
+enum LspSymbol {
+    Variable(String, Option<Type>),
+    /// label, parent function
+    Label(String, String),
+    /// name, signature
+    Function(String, Option<String>),
+}
+
+#[derive(Debug)]
+struct LspFileInfo {
+    line_starts: Vec<usize>,
+    document_symbols: Vec<DocumentSymbol>,
+    hover_complete_symbols: Vec<(LspSymbol, Span)>,
+}
+
 #[derive(Debug)]
 struct Backend {
     client: Client,
-    files: Arc<DashMap<PathBuf, Program>>,
+    //files: Arc<DashMap<PathBuf>>,
     builtin_completions: [CompletionItem; BUILTIN_COMPLETIONS_LENGTH],
+
+    files: Arc<DashMap<Url, LspFileInfo>>,
+}
+
+pub fn instruction_symbols<'ast, 'source>(
+    instruction: &'ast Instruction<'source>,
+) -> Vec<&'ast Loc<&'source str>> {
+    let mut symbols = vec![];
+    match instruction {
+        Instruction::Constant(constant) => symbols.push(&constant.name),
+        Instruction::ValueOperation(value_operation) => {
+            symbols.push(&value_operation.name)
+        }
+        Instruction::EffectOperation(_) => {}
+    }
+    symbols
 }
 
 impl Backend {
     fn new(client: Client) -> Self {
         Self {
             client,
-            files: Arc::new(DashMap::new()),
             builtin_completions: get_builtin_completions(),
+            files: Arc::new(DashMap::new()),
         }
     }
 
-    async fn compile(
+    fn find_hover_symbol(
+        &self,
+        uri: &Url,
+        position: &Position,
+    ) -> Option<(LspSymbol, Span)> {
+        let lsp_file_info = self.files.get(uri)?;
+        let byte_index = lsp_file_info.line_starts[position.line as usize]
+            + position.character as usize;
+        lsp_file_info
+            .hover_complete_symbols
+            .iter()
+            .find(|(_, span)| span.contains(&byte_index))
+            .cloned()
+    }
+
+    fn find_symbols_up_to(
+        &self,
+        uri: &Url,
+        position: &Position,
+    ) -> Option<Vec<(LspSymbol, Span)>> {
+        let lsp_file_info = self.files.get(uri)?;
+        let byte_index = lsp_file_info.line_starts[position.line as usize]
+            + position.character as usize;
+        Some(
+            lsp_file_info
+                .hover_complete_symbols
+                .iter()
+                .filter(|(_, span)| byte_index < span.end)
+                .cloned()
+                .collect(),
+        )
+    }
+
+    async fn compile_and_check_errors(
         &self,
         message: &'static str,
-        uri: Url,
-        version: Option<i32>,
-    ) {
+        uri: &Url,
+    ) -> Vec<Diagnostic> {
         let Ok(path) = PathBuf::from(uri.path()).canonicalize() else {
             self.client
                 .log_message(
@@ -208,7 +281,15 @@ impl Backend {
                     format!("{}: failed to canonicalize {}", message, uri),
                 )
                 .await;
-            return;
+            return vec![Diagnostic::new(
+                Range::new(Position::new(0, 0), Position::new(0, 0)),
+                Some(DiagnosticSeverity::ERROR),
+                None,
+                None,
+                format!("Failed to canonicalize file path {}", uri),
+                None,
+                None,
+            )];
         };
 
         self.client
@@ -221,157 +302,273 @@ impl Backend {
         let contents = match fs::read_to_string(&path) {
             Ok(contents) => contents,
             Err(error) => {
-                self.client
-                    .publish_diagnostics(
-                        uri,
-                        vec![Diagnostic::new(
-                            Range::new(
-                                Position::new(0, 0),
-                                Position::new(0, 0),
-                            ),
-                            Some(DiagnosticSeverity::ERROR),
-                            None,
-                            None,
-                            format!(
-                                "Failed to open file {}: {}",
-                                path.to_string_lossy(),
-                                error
-                            ),
-                            None,
-                            None,
-                        )],
-                        version,
-                    )
-                    .await;
-                return;
+                return vec![Diagnostic::new(
+                    Range::new(Position::new(0, 0), Position::new(0, 0)),
+                    Some(DiagnosticSeverity::ERROR),
+                    None,
+                    None,
+                    format!(
+                        "Failed to open file {}: {}",
+                        path.to_string_lossy(),
+                        error
+                    ),
+                    None,
+                    None,
+                )];
             }
         };
 
-        let parser = bril2json::bril_grammar::AbstractProgramParser::new();
-        let abstract_program = match parser.parse(
-            &bril2json::Lines::new(
-                &contents,
-                true,
-                true,
-                Some(path.to_string_lossy().to_string()),
-            ),
-            &contents,
-        ) {
-            Ok(abstract_program) => abstract_program,
-            Err(error) => {
-                let position = Position::new(0, 0);
-                self.client
-                    .publish_diagnostics(
-                        uri,
-                        vec![Diagnostic::new(
-                            Range::new(position, position),
-                            Some(DiagnosticSeverity::ERROR),
-                            None,
-                            None,
-                            format!(
-                                "Failed to parse program {}: {}",
-                                path.to_string_lossy(),
-                                error
-                            ),
-                            None,
-                            None,
-                        )],
-                        version,
-                    )
-                    .await;
-                return;
+        let mut diagnostics = vec![];
+
+        // https://docs.rs/codespan-reporting/latest/src/codespan_reporting/files.rs.html#251-253
+        fn line_starts(source: &str) -> impl '_ + Iterator<Item = usize> {
+            std::iter::once(0)
+                .chain(source.match_indices('\n').map(|(i, _)| i + 1))
+        }
+
+        // https://docs.rs/codespan-reporting/latest/codespan_reporting/files/fn.line_starts.html
+        fn line_index(
+            line_starts: &[usize],
+            byte_index: usize,
+        ) -> Option<usize> {
+            match line_starts.binary_search(&byte_index) {
+                Ok(line) => Some(line),
+                Err(next_line) => Some(next_line - 1),
+            }
+        }
+
+        let line_starts = line_starts(&contents).collect::<Vec<_>>();
+
+        fn index_to_position(
+            line_starts: &[usize],
+            byte_index: usize,
+        ) -> Position {
+            let zero_indexed_row = line_index(line_starts, byte_index)
+                .expect("INTERNAL BUG: Failed to turn byte index into row");
+            let zero_indexed_col = byte_index - line_starts[zero_indexed_row];
+            Position::new(zero_indexed_row as u32, zero_indexed_col as u32)
+        }
+
+        let span_to_range = |span: Span| -> Range {
+            Range::new(
+                index_to_position(&line_starts, span.start),
+                index_to_position(&line_starts, span.end),
+            )
+        };
+
+        let mut lexer = Token::lexer(&contents);
+        let mut tokens = vec![];
+        while let Some(next) = lexer.next() {
+            if let Ok(token) = next {
+                tokens.push(Loc::new(token, lexer.span()));
+            } else {
+                diagnostics.push(Diagnostic::new(
+                    span_to_range(lexer.span()),
+                    Some(DiagnosticSeverity::ERROR),
+                    None,
+                    Some("Bril lexer".into()),
+                    "Invalid input to Bril lexer. Check for invalid characters or encodings".into(),
+                    None,
+                    None,
+                ));
+            }
+        }
+
+        let mut parser = Parser::new(&tokens);
+
+        let document_symbol = |name: &Loc<&str>,
+                               detail: Option<String>,
+                               kind: SymbolKind,
+                               children: Option<Vec<DocumentSymbol>>|
+         -> DocumentSymbol {
+            let range = span_to_range(name.span());
+            DocumentSymbol {
+                name: name.to_string(),
+                detail,
+                kind,
+                tags: None,
+                deprecated: None,
+                range,
+                selection_range: range,
+                children,
             }
         };
-        let program: Program = match abstract_program.try_into() {
-            Ok(program) => program,
-            Err(error) => {
-                let position = Position::new(
-                    error.pos.as_ref().unwrap().pos.row as u32 - 1,
-                    error.pos.as_ref().unwrap().pos.col as u32 - 1,
+
+        match parser.parse_program() {
+            Ok(program) => {
+                let mut document_symbols = vec![];
+                let mut hover_complete_symbols = vec![];
+
+                for import in &program.imports {
+                    document_symbols.push(document_symbol(
+                        &import.path,
+                        None,
+                        SymbolKind::MODULE,
+                        None,
+                    ));
+                    for imported_function in &import.imported_functions {
+                        hover_complete_symbols.push((
+                            LspSymbol::Function(
+                                imported_function.name.to_string(),
+                                None,
+                            ),
+                            imported_function.name.span(),
+                        ));
+                        if let Some(alias_name) = imported_function
+                            .alias
+                            .as_ref()
+                            .map(|alias| &alias.name)
+                        {
+                            document_symbols.push(document_symbol(
+                                alias_name,
+                                None,
+                                SymbolKind::FUNCTION,
+                                None,
+                            ));
+                            hover_complete_symbols.push((
+                                LspSymbol::Function(
+                                    alias_name.to_string(),
+                                    None,
+                                ),
+                                alias_name.span(),
+                            ));
+                        } else {
+                            document_symbols.push(document_symbol(
+                                &imported_function.name,
+                                None,
+                                SymbolKind::FUNCTION,
+                                None,
+                            ));
+                        }
+                    }
+                }
+
+                for function in &program.functions {
+                    let mut children = vec![];
+
+                    for code in &function.body {
+                        match &**code {
+                            bril_frontend::ast::FunctionCode::Label {
+                                label,
+                                ..
+                            } => {
+                                children.push(document_symbol(
+                                    &label.name,
+                                    None,
+                                    SymbolKind::KEY,
+                                    None,
+                                ));
+                                hover_complete_symbols.push((
+                                    LspSymbol::Label(
+                                        label.name.to_string(),
+                                        function.name.to_string(),
+                                    ),
+                                    label.name.span(),
+                                ));
+                            }
+                            bril_frontend::ast::FunctionCode::Instruction(
+                                instruction,
+                            ) => {
+                                for instruction_symbol in
+                                    instruction_symbols(instruction)
+                                {
+                                    hover_complete_symbols.push((
+                                        LspSymbol::Variable(
+                                            instruction_symbol.to_string(),
+                                            None,
+                                        ),
+                                        instruction_symbol.span(),
+                                    ));
+                                }
+                            }
+                        }
+                    }
+
+                    let mut signature = format!(
+                        "({})",
+                        function
+                            .parameters
+                            .iter()
+                            .map(|(name, type_annotation)| format!(
+                                "{}: {}",
+                                name, type_annotation.ty
+                            ))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    );
+                    if let Some(return_type) = &function.return_type {
+                        signature.push_str(&format!(": {}", return_type.ty));
+                    }
+                    document_symbols.push(document_symbol(
+                        &function.name,
+                        Some(signature.clone()),
+                        SymbolKind::FUNCTION,
+                        Some(children),
+                    ));
+                    hover_complete_symbols.push((
+                        LspSymbol::Function(
+                            function.name.to_string(),
+                            Some(signature),
+                        ),
+                        function.name.span(),
+                    ));
+                }
+
+                self.files.insert(
+                    uri.clone(),
+                    LspFileInfo {
+                        line_starts,
+                        document_symbols,
+                        hover_complete_symbols,
+                    },
                 );
-                self.client
-                    .publish_diagnostics(
-                        uri,
-                        vec![Diagnostic::new(
-                            Range::new(position, position),
-                            Some(DiagnosticSeverity::ERROR),
-                            None,
-                            None,
-                            format!(
-                                "Failed to parse program {}: {}",
-                                path.to_string_lossy(),
-                                error
-                            ),
-                            None,
-                            None,
-                        )],
-                        version,
-                    )
-                    .await;
-                return;
             }
-        };
+            Err(()) => {
+                for diagnostic in parser.diagnostics() {
+                    diagnostics.push(Diagnostic::new(
+                        span_to_range(diagnostic.span.clone()),
+                        Some(DiagnosticSeverity::ERROR),
+                        None,
+                        Some("Bril parser".into()),
+                        diagnostic.message.clone(),
+                        Some(
+                            diagnostic
+                                .labels
+                                .iter()
+                                .map(|(text, span)| {
+                                    DiagnosticRelatedInformation {
+                                        location: Location::new(
+                                            uri.clone(),
+                                            span_to_range(
+                                                span.clone().unwrap_or(
+                                                    diagnostic.span.clone(),
+                                                ),
+                                            ),
+                                        ),
+                                        message: text.clone(),
+                                    }
+                                })
+                                .collect(),
+                        ),
+                        None,
+                    ));
+                }
+            }
+        }
 
-        // let basic_block_program = match BBProgram::new(program) {
-        //     Ok(basic_block_program) => basic_block_program,
-        //     Err(error) => {
-        //         self.client
-        //             .publish_diagnostics(
-        //                 uri,
-        //                 vec![Diagnostic::new(
-        //                     Range::new(
-        //                         Position::new(0, 0),
-        //                         Position::new(0, 0),
-        //                     ),
-        //                     Some(DiagnosticSeverity::ERROR),
-        //                     None,
-        //                     None,
-        //                     format!(
-        //                         "Failed to build basic block program from {}: {}",
-        //                         path.to_string_lossy(),
-        //                         error
-        //                     ),
-        //                     None,
-        //                     None,
-        //                 )],
-        //                 version
-        //             )
-        //             .await;
-        //         return;
-        //     }
-        // };
+        diagnostics
+    }
 
-        // if let Err(error) = check::type_check(&basic_block_program) {
-        //     let error_message = error.to_string();
-        //     let position = error
-        //         .pos
-        //         .as_ref()
-        //         .map(|pos| {
-        //             Position::new(
-        //                 pos.pos.row as u32 - 1,
-        //                 pos.pos.col as u32 - 1,
-        //             )
-        //         })
-        //         .unwrap_or(Position::new(0, 0));
-        //     self.client
-        //         .publish_diagnostics(
-        //             uri,
-        //             vec![Diagnostic::new(
-        //                 Range::new(position, position),
-        //                 Some(DiagnosticSeverity::ERROR),
-        //                 None,
-        //                 None,
-        //                 format!("Program failed to type check",),
-        //                 None,
-        //                 None,
-        //             )],
-        //             version,
-        //         )
-        //         .await;
-        //     return;
-        // }
-
-        self.files.insert(path, program);
+    async fn compile(
+        &self,
+        message: &'static str,
+        uri: Url,
+        version: Option<i32>,
+    ) {
+        let diagnostics = self.compile_and_check_errors(message, &uri).await;
+        self.client
+            .publish_diagnostics(uri, diagnostics, version)
+            .await;
     }
 }
 
@@ -385,6 +582,7 @@ impl LanguageServer for Backend {
             capabilities: ServerCapabilities {
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions::default()),
+                document_symbol_provider: Some(OneOf::Left(true)),
                 ..Default::default()
             },
             ..Default::default()
@@ -426,24 +624,97 @@ impl LanguageServer for Backend {
 
     async fn completion(
         &self,
-        _: CompletionParams,
+        params: CompletionParams,
     ) -> jsonrpc::Result<Option<CompletionResponse>> {
-        Ok(Some(CompletionResponse::Array(
-            self.builtin_completions.to_vec(),
-        )))
+        let mut completions = self.builtin_completions.to_vec();
+        if let Some(symbols) = self.find_symbols_up_to(
+            &params.text_document_position.text_document.uri,
+            &params.text_document_position.position,
+        ) {
+            completions.extend(symbols.iter().map(|(symbol, _)| {
+                CompletionItem {
+                    label: match symbol {
+                        LspSymbol::Variable(name, _)
+                        | LspSymbol::Label(name, _)
+                        | LspSymbol::Function(name, _) => name.clone(),
+                    },
+                    kind: Some(match symbol {
+                        LspSymbol::Variable(_, _) => {
+                            CompletionItemKind::VARIABLE
+                        }
+                        LspSymbol::Label(_, _) => CompletionItemKind::FUNCTION,
+                        LspSymbol::Function(_, _) => {
+                            CompletionItemKind::FUNCTION
+                        }
+                    }),
+                    detail: Some(match symbol {
+                        LspSymbol::Variable(_, ty) => ty
+                            .as_ref()
+                            .map(|ty| ty.to_string())
+                            .unwrap_or_default(),
+                        LspSymbol::Label(_, function) => {
+                            format!("Defined in `{}`", function)
+                        }
+                        LspSymbol::Function(_, signature) => {
+                            signature.clone().unwrap_or_default()
+                        }
+                    }),
+                    documentation: None,
+                    ..Default::default()
+                }
+            }));
+        }
+        Ok(Some(CompletionResponse::Array(completions)))
     }
 
     async fn hover(
         &self,
-        _hover: HoverParams,
+        hover: HoverParams,
     ) -> jsonrpc::Result<Option<Hover>> {
-        Ok(None)
-        // Ok(Some(Hover {
-        //     contents: HoverContents::Scalar(MarkedString::String(
-        //         "You're hovering!".to_string(),
-        //     )),
-        //     range: None,
-        // }))
+        let Some(symbol) = self.find_hover_symbol(
+            &hover.text_document_position_params.text_document.uri,
+            &hover.text_document_position_params.position,
+        ) else {
+            return Ok(None);
+        };
+        Ok(Some(Hover {
+            contents: HoverContents::Scalar(MarkedString::String(
+                match symbol.0 {
+                    LspSymbol::Variable(name, ty) => format!(
+                        "Variable `{}`{}",
+                        name,
+                        if let Some(ty) = ty {
+                            format!(": `{}`", ty)
+                        } else {
+                            "".into()
+                        }
+                    ),
+                    LspSymbol::Label(label, function) => format!(
+                        "Label `{}`, defined in function `{}`",
+                        label, function
+                    ),
+                    LspSymbol::Function(function, signature) => format!(
+                        "Function `{}{}",
+                        function,
+                        if let Some(signature) = signature {
+                            format!("{}`", signature)
+                        } else {
+                            "`".into()
+                        }
+                    ),
+                },
+            )),
+            range: None,
+        }))
+    }
+
+    async fn document_symbol(
+        &self,
+        params: DocumentSymbolParams,
+    ) -> jsonrpc::Result<Option<DocumentSymbolResponse>> {
+        Ok(self.files.get(&params.text_document.uri).map(|info| {
+            DocumentSymbolResponse::Nested(info.document_symbols.to_vec())
+        }))
     }
 }
 

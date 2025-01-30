@@ -22,9 +22,14 @@ macro_rules! parser_snapshot {
             let Ok(program) = parser.parse_program() else {
                 for diagnostic in parser.diagnostics() {
                     println!("{}:", diagnostic.message);
-                    if let Some((text, span)) = &diagnostic.label {
+                    for (text, span) in &diagnostic.labels {
                         println!("Label: {}", text);
-                        println!("Code: `{}`", &code[span.clone()]);
+                        println!(
+                            "Code: `{}`",
+                            &code[span
+                                .clone()
+                                .unwrap_or(diagnostic.span.clone())]
+                        );
                     }
                 }
                 panic!("Failed to parse program");

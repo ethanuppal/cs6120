@@ -12,6 +12,8 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
+use std::fmt;
+
 use crate::loc::Loc;
 
 pub struct Program<'a> {
@@ -55,12 +57,25 @@ pub struct Label<'a> {
     pub name: Loc<&'a str>,
 }
 
+#[derive(Debug, Clone)]
 pub enum Type {
     Int,
     Bool,
     Float,
     Char,
     Ptr(Box<Loc<Type>>),
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Type::Int => "int".fmt(f),
+            Type::Bool => "bool".fmt(f),
+            Type::Float => "float".fmt(f),
+            Type::Char => "char".fmt(f),
+            Type::Ptr(inner) => write!(f, "ptr<{}>", inner),
+        }
+    }
 }
 
 pub struct TypeAnnotation {

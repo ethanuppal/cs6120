@@ -20,14 +20,16 @@ use crate::{
 
 pub struct Diagnostic {
     pub message: String,
-    pub label: Option<(String, Span)>,
+    pub span: Span,
+    pub labels: Vec<(String, Option<Span>)>,
 }
 
 impl Diagnostic {
-    pub fn new(message: impl Into<String>) -> Self {
+    pub fn new(message: impl Into<String>, spanned: impl Spanned) -> Self {
         Self {
             message: message.into(),
-            label: None,
+            span: spanned.span(),
+            labels: vec![],
         }
     }
 
@@ -36,7 +38,12 @@ impl Diagnostic {
         text: impl Into<String>,
         spanned: impl Spanned,
     ) -> Self {
-        self.label = Some((text.into(), spanned.span()));
+        self.labels.push((text.into(), Some(spanned.span())));
+        self
+    }
+
+    pub fn explain(mut self, text: impl Into<String>) -> Self {
+        self.labels.push((text.into(), None));
         self
     }
 }
@@ -170,20 +177,26 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         } else {
             if let Some(current) = self.tokens.get(self.index) {
                 self.diagnostics.push(
-                    Diagnostic::new(format!(
-                        "Unexpected '{}', expected '{}'",
-                        current.pattern_name(),
-                        pattern.pattern_name(),
-                    ))
-                    .label(message, current),
+                    Diagnostic::new(
+                        format!(
+                            "Unexpected '{}', expected '{}'",
+                            current.pattern_name(),
+                            pattern.pattern_name(),
+                        ),
+                        current,
+                    )
+                    .explain(message),
                 );
             } else {
                 self.diagnostics.push(
-                    Diagnostic::new(format!(
-                        "Unexpected EOF, expected '{}'",
-                        pattern.pattern_name()
-                    ))
-                    .label(message, self.eof_span()),
+                    Diagnostic::new(
+                        format!(
+                            "Unexpected EOF, expected '{}'",
+                            pattern.pattern_name()
+                        ),
+                        self.eof_span(),
+                    )
+                    .explain(message),
                 );
             }
 
@@ -212,7 +225,7 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         }
 
         self.diagnostics.push(
-            Diagnostic::new(message).label("Recovery started here", current),
+            Diagnostic::new(message, current).explain("Recovery started here"),
         );
     }
 
@@ -248,7 +261,8 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
                     self.advance();
                 } else {
                     self.diagnostics.push(
-                        Diagnostic::new(format!(
+                        Diagnostic::new(
+                            format!(
                             "Unexpected EOF, expected separator (one of: {})",
                             separators
                                 .iter()
@@ -258,8 +272,10 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
                                 ))
                                 .collect::<Vec<_>>()
                                 .join(", "),
-                        ))
-                        .label(message, self.eof_span()),
+                        ),
+                            self.eof_span(),
+                        )
+                        .explain(message),
                     );
                     return Err(());
                 }
@@ -269,18 +285,21 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         }
 
         self.diagnostics.push(
-            Diagnostic::new(format!(
-                "Unexpected EOF, expected terminator (one of: {})",
-                terminators
-                    .into_iter()
-                    .map(|terminator| format!(
-                        "'{}'",
-                        terminator.pattern_name()
-                    ))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            ))
-            .label(message, self.eof_span()),
+            Diagnostic::new(
+                format!(
+                    "Unexpected EOF, expected terminator (one of: {})",
+                    terminators
+                        .into_iter()
+                        .map(|terminator| format!(
+                            "'{}'",
+                            terminator.pattern_name()
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                ),
+                self.eof_span(),
+            )
+            .explain(message),
         );
         Err(())
     }
@@ -390,11 +409,13 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
             Ok(ast::ConstantValue::BooleanLiteral(false.at(&span)).at(span))
         } else {
             self.diagnostics.push(Diagnostic::new(
-                "Unknown constant value: expected integer, float, or character")
-                .label("This is not a valid constant value",
-                self.get(0)
+                "Unknown constant value: expected integer, float, or character",
+self.get(0)
                     .map(|token| token.span())
-                    .unwrap_or(self.eof_span()))
+                    .unwrap_or(self.eof_span())
+            )
+                .explain("This is not a valid constant value"
+                )
             );
             Err(())
         }
@@ -447,10 +468,8 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         try_op!(self; op_name: "id" => ValueOperationOp::Id(value as Token::Identifier));
 
         self.diagnostics.push(
-            Diagnostic::new("Unknown value operation").label(
-                "Could not parse identifier as value operation",
-                op_name,
-            ),
+            Diagnostic::new("Unknown value operation", op_name)
+                .explain("Could not parse identifier as value operation"),
         );
 
         Err(())
@@ -500,10 +519,8 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         try_op!(self; op_name: "nop" => EffectOperationOp::Nop);
 
         self.diagnostics.push(
-            Diagnostic::new("Unknown effect operation").label(
-                "Could not parse identifier as value operation",
-                op_name,
-            ),
+            Diagnostic::new("Unknown effect operation", op_name)
+                .explain("Could not parse identifier as value operation"),
         );
 
         Err(())
@@ -626,8 +643,8 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
             }
             _ => {
                 self.diagnostics.push(
-                    Diagnostic::new("Unknown type")
-                        .label("This is not a valid type", ty),
+                    Diagnostic::new("Unknown type", ty)
+                        .explain("This is not a valid type"),
                 );
                 return Err(());
             }
