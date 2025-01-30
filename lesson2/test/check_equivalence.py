@@ -44,6 +44,7 @@ def check_file(args):
     passthrough_code = subprocess.check_output(
         f"bril2json <{filename} | {executable} | bril2json",
         shell=True,
+        stderr=subprocess.DEVNULL,
     ).decode("utf-8")
     given_bril = json.loads(given_code)
     passthrough_bril = json.loads(passthrough_code)

@@ -12,7 +12,7 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{env, fs, path::PathBuf};
+use std::{env, fs, io, path::PathBuf};
 
 use annotate_snippets::{Level, Renderer, Snippet};
 use bril_frontend::{lexer::Token, loc::Loc, parser::Parser, printer::Printer};
@@ -23,15 +23,24 @@ use snafu::{whatever, OptionExt, ResultExt, Whatever};
 fn main() -> Result<(), Whatever> {
     let file = env::args()
         .nth(1)
-        .map(PathBuf::from)
         .whatever_context("Takes one file as an argument")?;
 
-    let contents = fs::read_to_string(&file).whatever_context(format!(
-        "Failed to read {}",
-        file.to_string_lossy()
-    ))?;
+    let mut reader: Box<dyn io::Read> = match file.as_str() {
+        "-" => Box::new(io::stdin()),
+        _ => Box::new(
+            fs::File::open(&file)
+                .whatever_context(format!("Failed to open {}", file))?,
+        ),
+    };
 
-    let mut lexer = Token::lexer(&contents);
+    let mut contents = vec![];
+    reader
+        .read_to_end(&mut contents)
+        .whatever_context(format!("Failed to read {}", file))?;
+    let code = String::from_utf8(contents)
+        .whatever_context("Couldn't decode file as UTF-8")?;
+
+    let mut lexer = Token::lexer(&code);
     let mut tokens = vec![];
     while let Some(next) = lexer.next() {
         if let Ok(token) = next {
@@ -45,19 +54,13 @@ fn main() -> Result<(), Whatever> {
 
     let Ok(program) = parser.parse_program() else {
         let renderer = Renderer::styled();
-        let filename = file.to_string_lossy().to_string();
         for diagnostic in parser.diagnostics() {
             let mut message = Level::Error.title(&diagnostic.message);
             if let Some((text, span)) = &diagnostic.label {
                 message = message.snippet(
-                    Snippet::source(&contents)
-                        .origin(&filename)
-                        .fold(true)
-                        .annotation(
-                            Level::Error
-                                .span(span.clone())
-                                .label(text.as_str()),
-                        ),
+                    Snippet::source(&code).origin(&file).fold(true).annotation(
+                        Level::Error.span(span.clone()).label(text.as_str()),
+                    ),
                 );
             }
             println!("{}", renderer.render(message));
