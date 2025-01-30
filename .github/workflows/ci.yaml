@@ -9,7 +9,7 @@ on:
      - main
 
 env:
-  CARGO_INCREMENTAL: 0
+  CARGO_INCREMENTAL: 1
 
 jobs:
   bril_frontend:
