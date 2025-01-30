@@ -14,6 +14,7 @@
 
 use std::{env, fs, path::PathBuf};
 
+use annotate_snippets::{Level, Renderer, Snippet};
 use bril_frontend::{lexer::Token, loc::Loc, parser::Parser, printer::Printer};
 use logos::Logos;
 use snafu::{whatever, OptionExt, ResultExt, Whatever};
@@ -43,11 +44,25 @@ fn main() -> Result<(), Whatever> {
     let mut parser = Parser::new(&tokens);
 
     let Ok(program) = parser.parse_program() else {
+        let renderer = Renderer::styled();
+        let filename = file.to_string_lossy().to_string();
         for diagnostic in parser.diagnostics() {
-            println!("{}:", diagnostic.message);
-            println!("  {}", &contents[diagnostic.span.clone()]);
+            let mut message = Level::Error.title(&diagnostic.message);
+            if let Some((text, span)) = &diagnostic.label {
+                message = message.snippet(
+                    Snippet::source(&contents)
+                        .origin(&filename)
+                        .fold(true)
+                        .annotation(
+                            Level::Error
+                                .span(span.clone())
+                                .label(text.as_str()),
+                        ),
+                );
+            }
+            println!("{}", renderer.render(message));
         }
-        whatever!("Failed to parse program");
+        whatever!("Exiting due to errors");
     };
 
     let mut buffer = String::new();

@@ -115,7 +115,7 @@ pub struct ValueOperation<'a> {
     pub semi_token: Loc<()>,
 }
 
-pub enum EffectOperation<'a> {
+pub enum EffectOperationOp<'a> {
     Jmp(Loc<Label<'a>>),
     Br(Loc<Label<'a>>, Loc<Label<'a>>),
     Call(Loc<&'a str>, Vec<Loc<&'a str>>),
@@ -123,4 +123,9 @@ pub enum EffectOperation<'a> {
 
     Print(Vec<Loc<&'a str>>),
     Nop,
+}
+
+pub struct EffectOperation<'a> {
+    pub op: Loc<EffectOperationOp<'a>>,
+    pub semi_token: Loc<()>,
 }

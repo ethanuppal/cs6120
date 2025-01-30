@@ -20,15 +20,24 @@ use crate::{
 
 pub struct Diagnostic {
     pub message: String,
-    pub span: Span,
+    pub label: Option<(String, Span)>,
 }
 
 impl Diagnostic {
-    pub fn new(message: impl Into<String>, spanned: impl Spanned) -> Self {
+    pub fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
-            span: spanned.span(),
+            label: None,
         }
+    }
+
+    pub fn label(
+        mut self,
+        text: impl Into<String>,
+        spanned: impl Spanned,
+    ) -> Self {
+        self.label = Some((text.into(), spanned.span()));
+        self
     }
 }
 
@@ -39,6 +48,55 @@ pub struct Parser<'tokens, 'source: 'tokens> {
 }
 
 pub type Result<T> = std::result::Result<T, ()>;
+
+macro_rules! try_op {
+    (@parse_argument; $self:ident; Token::Identifier) => {
+        $self.try_eat(Token::Identifier(""))?.map(Token::assume_identifier)
+    };
+    (@parse_argument; $self:ident; Token::Label) => {
+        {
+            let label = $self.try_eat(Token::Label(""))?.map(Token::assume_label);
+            let span = label.span();
+            $crate::ast::Label { name: label }.at(span)
+        }
+    };
+    (@parse_argument; $self:ident; Token::FunctionName) => {
+        $self.try_eat(Token::FunctionName(""))?.map(Token::assume_function_name)
+    };
+    (@parse_argument; $self:ident; Vec::from) => {
+        {
+            let mut arguments = vec![];
+            while !$self.is_eof() && !$self.is_at(&Token::Semi) {
+                arguments.push($self.eat(Token::Identifier(""), "Only variable names are valid variadic arguments").ok()?.map(Token::assume_identifier))
+            }
+            arguments
+        }
+    };
+    (
+        $self:ident;
+        $op_name:ident:$name:literal =>
+        $enum:ident::$variant:ident$(($($argument_name:ident as $scope:ident::$token:ident),*))?
+    ) => {
+        #[allow(clippy::redundant_closure_call)]
+        if let Some((op, end)) = (|| -> Option<($crate::ast::$enum, $crate::loc::Span)> {
+            #[allow(unused_assignments)]
+            #[allow(unused_mut)]
+            let mut end = $op_name.span();
+            $($(
+                let $argument_name = try_op!(@parse_argument; $self; $scope::$token);
+                if let Some(span) = $crate::loc::MaybeSpanned::try_span(&$argument_name) {
+                    end = span;
+                }
+            )*)*
+            Some((
+                $crate::ast::$enum::$variant $(($($argument_name),*))*,
+                end
+            ))
+        })() {
+            return Ok(op.between($op_name, end))
+        }
+    };
+}
 
 #[allow(clippy::result_unit_err)]
 impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
@@ -107,24 +165,22 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
             Ok(result)
         } else {
             if let Some(current) = self.tokens.get(self.index) {
-                self.diagnostics.push(Diagnostic::new(
-                    format!(
-                        "Unexpected '{}', expected '{}': {}",
+                self.diagnostics.push(
+                    Diagnostic::new(format!(
+                        "Unexpected '{}', expected '{}'",
                         current.pattern_name(),
                         pattern.pattern_name(),
-                        message.into(),
-                    ),
-                    current,
-                ));
+                    ))
+                    .label(message, current),
+                );
             } else {
-                self.diagnostics.push(Diagnostic::new(
-                    format!(
-                        "Unexpected EOF, expected '{}': {}",
-                        pattern.pattern_name(),
-                        message.into()
-                    ),
-                    self.eof_span(),
-                ));
+                self.diagnostics.push(
+                    Diagnostic::new(format!(
+                        "Unexpected EOF, expected '{}'",
+                        pattern.pattern_name()
+                    ))
+                    .label(message, self.eof_span()),
+                );
             }
 
             Err(())
@@ -144,8 +200,7 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
             self.index += 1;
         }
 
-        self.diagnostics
-            .push(Diagnostic::new(message, self.eof_span()));
+        self.diagnostics.push(Diagnostic::new(message));
     }
 
     pub fn parse_separated<'a, U, F: FnMut(&mut Self) -> Result<U>>(
@@ -179,21 +234,20 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
                 {
                     self.advance();
                 } else {
-                    self.diagnostics.push(Diagnostic::new(
-                        format!(
-                        "Unexpected EOF, expected separator (one of: {}): {}",
-                        separators
-                            .iter()
-                            .map(|separator| format!(
-                                "'{}'",
-                                separator.pattern_name()
-                            ))
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                        message.into()
-                    ),
-                        self.eof_span(),
-                    ));
+                    self.diagnostics.push(
+                        Diagnostic::new(format!(
+                            "Unexpected EOF, expected separator (one of: {})",
+                            separators
+                                .iter()
+                                .map(|separator| format!(
+                                    "'{}'",
+                                    separator.pattern_name()
+                                ))
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        ))
+                        .label(message, self.eof_span()),
+                    );
                     return Err(());
                 }
             }
@@ -201,9 +255,9 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
             result.push(f(self)?);
         }
 
-        self.diagnostics.push(Diagnostic::new(
-            format!(
-                "Unexpected EOF, expected terminator (one of: {}): {}",
+        self.diagnostics.push(
+            Diagnostic::new(format!(
+                "Unexpected EOF, expected terminator (one of: {})",
                 terminators
                     .into_iter()
                     .map(|terminator| format!(
@@ -212,10 +266,9 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
                     ))
                     .collect::<Vec<_>>()
                     .join(", "),
-                message.into()
-            ),
-            self.eof_span(),
-        ));
+            ))
+            .label(message, self.eof_span()),
+        );
         Err(())
     }
 
@@ -318,11 +371,12 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
             .at(span))
         } else {
             self.diagnostics.push(Diagnostic::new(
-                "Unknown constant value: expected integer, float, or character",
+                "Unknown constant value: expected integer, float, or character")
+                .label("This is not a valid constant value",
                 self.get(0)
                     .map(|token| token.span())
-                    .unwrap_or(self.eof_span()),
-            ));
+                    .unwrap_or(self.eof_span()))
+            );
             Err(())
         }
     }
@@ -358,40 +412,18 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         &mut self,
         op_name: Loc<&'source str>,
     ) -> Result<Loc<ast::ValueOperationOp<'source>>> {
-        macro_rules! try_op {
-            (@parse_argument; $self:ident; Identifier) => {
-                $self.try_eat(Token::Identifier(""))?.map(Token::assume_identifier)
-            };
-            ($self:ident; $op_name:ident:$name:literal => $enum:ident::$variant:ident($($token_name:ident as Token::$token:ident $(end:$span:ident)?),*)) => {
-                if let Some((op, end)) = (|| -> Option<($crate::ast::$enum, $crate::loc::Span)> {
-                    #[allow(unused_assignments)]
-                    let mut end = $op_name.span();
-                    $(
-                        let $token_name = try_op!(@parse_argument; $self; $token);
-                        $(end = $token_name.$span();)*
-                    )*
-                    Some((
-                        $crate::ast::$enum::$variant($($token_name),*),
-                        end
-                    ))
-                })() {
-                    return Ok(op.between($op_name, end))
-                }
-            };
-        }
-
-        try_op!(self; op_name: "add" => ValueOperationOp::Add(lhs as Token::Identifier, rhs as Token::Identifier end:span));
-        try_op!(self; op_name: "mul" => ValueOperationOp::Mul(lhs as Token::Identifier, rhs as Token::Identifier end:span));
-        try_op!(self; op_name: "sub" => ValueOperationOp::Sub(lhs as Token::Identifier, rhs as Token::Identifier end:span));
-        try_op!(self; op_name: "div" => ValueOperationOp::Div(lhs as Token::Identifier, rhs as Token::Identifier end:span));
-        try_op!(self; op_name: "eq" => ValueOperationOp::Eq(lhs as Token::Identifier, rhs as Token::Identifier end:span));
-        try_op!(self; op_name: "gt" => ValueOperationOp::Gt(lhs as Token::Identifier, rhs as Token::Identifier end:span));
-        try_op!(self; op_name: "le" => ValueOperationOp::Le(lhs as Token::Identifier, rhs as Token::Identifier end:span));
-        try_op!(self; op_name: "ge" => ValueOperationOp::Ge(lhs as Token::Identifier, rhs as Token::Identifier end:span));
-        try_op!(self; op_name: "not" => ValueOperationOp::Not(value as Token::Identifier end:span));
-        try_op!(self; op_name: "and" => ValueOperationOp::And(lhs as Token::Identifier, rhs as Token::Identifier end:span));
-        try_op!(self; op_name: "or" => ValueOperationOp::Or(lhs as Token::Identifier, rhs as Token::Identifier end:span));
-        try_op!(self; op_name: "id" => ValueOperationOp::Id(value as Token::Identifier end:span));
+        try_op!(self; op_name: "add" => ValueOperationOp::Add(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "mul" => ValueOperationOp::Mul(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "sub" => ValueOperationOp::Sub(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "div" => ValueOperationOp::Div(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "eq" => ValueOperationOp::Eq(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "gt" => ValueOperationOp::Gt(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "le" => ValueOperationOp::Le(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "ge" => ValueOperationOp::Ge(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "not" => ValueOperationOp::Not(value as Token::Identifier));
+        try_op!(self; op_name: "and" => ValueOperationOp::And(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "or" => ValueOperationOp::Or(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "id" => ValueOperationOp::Id(value as Token::Identifier));
 
         Err(())
     }
@@ -422,10 +454,37 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         .between(start, end))
     }
 
+    pub fn parse_effect_operation_op(
+        &mut self,
+    ) -> Result<Loc<ast::EffectOperationOp<'source>>> {
+        let op_name = self.eat(
+            Token::Identifier(""),
+            "Missing operation name for effect operation",
+        )?;
+
+        try_op!(self; op_name: "jmp" => EffectOperationOp::Jmp(destination as Token::Label));
+        try_op!(self; op_name: "br" => EffectOperationOp::Br(if_true as Token::Label, if_false as Token::Label));
+        try_op!(self; op_name: "call" => EffectOperationOp::Call(destination as Token::FunctionName, arguments as Vec::from));
+        try_op!(self; op_name: "ret" => EffectOperationOp::Ret);
+        try_op!(self; op_name: "print" => EffectOperationOp::Print(value as Vec::from));
+        try_op!(self; op_name: "nop" => EffectOperationOp::Nop);
+
+        Err(())
+    }
+
     pub fn parse_effect_operation(
         &mut self,
     ) -> Result<Loc<ast::EffectOperation<'source>>> {
-        todo!()
+        let op = self.parse_effect_operation_op()?;
+        let semi_token = self
+            .eat(
+                Token::Semi,
+                "Expected semicolon at end of effect operation instruction",
+            )?
+            .without_inner();
+        let start = op.span();
+        let end = semi_token.span();
+        Ok(ast::EffectOperation { op, semi_token }.between(start, end))
     }
 
     pub fn parse_instruction(
@@ -528,7 +587,10 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
                 ast::Type::Ptr(Box::new(inner)).between(ty, end)
             }
             _ => {
-                self.diagnostics.push(Diagnostic::new("Unknown type", ty));
+                self.diagnostics.push(
+                    Diagnostic::new("Unknown type")
+                        .label("This is not a valid type", ty),
+                );
                 return Err(());
             }
         })

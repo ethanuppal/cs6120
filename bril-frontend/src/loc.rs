@@ -104,3 +104,26 @@ pub trait WithLocation {
 }
 
 impl<T> WithLocation for T {}
+
+pub trait MaybeSpanned {
+    fn try_span(&self) -> Option<Span>;
+}
+
+impl<T: Spanned> MaybeSpanned for T {
+    fn try_span(&self) -> Option<Span> {
+        Some(self.span())
+    }
+}
+
+impl<T: Spanned> MaybeSpanned for Vec<T> {
+    fn try_span(&self) -> Option<Span> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(
+                self.first().unwrap().span().start
+                    ..self.last().unwrap().span().end,
+            )
+        }
+    }
+}
