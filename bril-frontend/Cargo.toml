@@ -1,0 +1,13 @@
+[package]
+name = "bril-frontend"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+logos.workspace = true
+inform.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+snafu.workspace = true

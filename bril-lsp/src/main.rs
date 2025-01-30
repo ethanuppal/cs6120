@@ -14,7 +14,7 @@
 use std::{fs, path::PathBuf, sync::Arc};
 
 use bril_rs::Program;
-use brilirs::{basic_block::BBProgram, check};
+//use brilirs::{basic_block::BBProgram, check};
 use dashmap::DashMap;
 use tower_lsp::{
     jsonrpc, lsp_types::*, Client, LanguageServer, LspService, Server,
@@ -247,12 +247,47 @@ impl Backend {
             }
         };
 
-        let program: Program = match serde_json::from_str(&contents) {
+        let parser = bril2json::bril_grammar::AbstractProgramParser::new();
+        let abstract_program = match parser.parse(
+            &bril2json::Lines::new(
+                &contents,
+                true,
+                true,
+                Some(path.to_string_lossy().to_string()),
+            ),
+            &contents,
+        ) {
+            Ok(abstract_program) => abstract_program,
+            Err(error) => {
+                let position = Position::new(0, 0);
+                self.client
+                    .publish_diagnostics(
+                        uri,
+                        vec![Diagnostic::new(
+                            Range::new(position, position),
+                            Some(DiagnosticSeverity::ERROR),
+                            None,
+                            None,
+                            format!(
+                                "Failed to parse program {}: {}",
+                                path.to_string_lossy(),
+                                error
+                            ),
+                            None,
+                            None,
+                        )],
+                        version,
+                    )
+                    .await;
+                return;
+            }
+        };
+        let program: Program = match abstract_program.try_into() {
             Ok(program) => program,
             Err(error) => {
                 let position = Position::new(
-                    error.line() as u32 - 1,
-                    error.column() as u32 - 1,
+                    error.pos.as_ref().unwrap().pos.row as u32 - 1,
+                    error.pos.as_ref().unwrap().pos.col as u32 - 1,
                 );
                 self.client
                     .publish_diagnostics(
