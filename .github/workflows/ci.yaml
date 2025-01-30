@@ -38,7 +38,7 @@ jobs:
       - name: Test correct parsing
         run: |
           cd lesson2
-          python3 test/check_equivalence.py "bril-frontend --example print" "../target/debug/examples/print -" \
+          python3 test/check_equivalence.py "bril-frontend --example print" "../target/debug/examples/print -" "cat" \
             ../bril/benchmarks/**/*.bril \
             --exclude ../bril/benchmarks/float/cordic.bril
 
