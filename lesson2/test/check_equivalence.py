@@ -56,6 +56,7 @@ def check_file(args):
     else:
         print(f"\x1b[31;1m{filename} ERROR\x1b[m")
         event.set()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
@@ -86,6 +87,7 @@ if __name__ == "__main__":
                 pool.join()
                 if shared_event.is_set():
                     print("Some tests failed!")
+                    pool.terminate()
                     sys.exit(1)
             except:
                 pass
