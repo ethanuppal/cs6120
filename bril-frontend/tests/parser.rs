@@ -49,6 +49,11 @@ parser_snapshot! {
 }
 
 parser_snapshot! {
+    add_bril_parses,
+    include_str!("../bril-programs/add.bril")
+}
+
+parser_snapshot! {
     import_bril_parses,
     include_str!("../bril-programs/import.bril")
 }

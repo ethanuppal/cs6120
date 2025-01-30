@@ -183,6 +183,57 @@ impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
         writeln!(self.w, ";")
     }
 
+    pub fn print_effect_operation_op(
+        &mut self,
+        effect_operation_op: &ast::EffectOperationOp,
+    ) -> fmt::Result {
+        match effect_operation_op {
+            ast::EffectOperationOp::Jmp(destination) => {
+                write!(self.w, "jmp ")?;
+                self.print_label(destination)
+            }
+            ast::EffectOperationOp::Br(condition, if_true, if_false) => {
+                write!(self.w, "br {} ", condition)?;
+                self.print_label(if_true)?;
+                write!(self.w, " ")?;
+                self.print_label(if_false)
+            }
+            ast::EffectOperationOp::Call(function_name, arguments) => {
+                write!(
+                    self.w,
+                    "call {} {}",
+                    function_name,
+                    arguments
+                        .iter()
+                        .map(|argument| argument.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            }
+            ast::EffectOperationOp::Ret => write!(self.w, "ret"),
+            ast::EffectOperationOp::Print(arguments) => {
+                write!(
+                    self.w,
+                    "print {}",
+                    arguments
+                        .iter()
+                        .map(|argument| argument.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            }
+            ast::EffectOperationOp::Nop => write!(self.w, "nop"),
+        }
+    }
+
+    pub fn print_effect_operation(
+        &mut self,
+        effect_operation: &ast::EffectOperation,
+    ) -> fmt::Result {
+        self.print_effect_operation_op(&effect_operation.op)?;
+        writeln!(self.w, ";")
+    }
+
     pub fn print_instruction(
         &mut self,
         instruction: &ast::Instruction,
@@ -194,7 +245,9 @@ impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
             ast::Instruction::ValueOperation(value_operation) => {
                 self.print_value_operation(value_operation)
             }
-            ast::Instruction::EffectOperation(loc) => todo!(),
+            ast::Instruction::EffectOperation(effect_operation) => {
+                self.print_effect_operation(effect_operation)
+            }
         }
     }
 

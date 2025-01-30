@@ -117,7 +117,7 @@ pub struct ValueOperation<'a> {
 
 pub enum EffectOperationOp<'a> {
     Jmp(Loc<Label<'a>>),
-    Br(Loc<Label<'a>>, Loc<Label<'a>>),
+    Br(Loc<&'a str>, Loc<Label<'a>>, Loc<Label<'a>>),
     Call(Loc<&'a str>, Vec<Loc<&'a str>>),
     Ret,
 

@@ -51,23 +51,23 @@ pub type Result<T> = std::result::Result<T, ()>;
 
 macro_rules! try_op {
     (@parse_argument; $self:ident; Token::Identifier) => {
-        $self.try_eat(Token::Identifier(""))?.map(Token::assume_identifier)
+        $self.eat(Token::Identifier(""), "Expected variable name for argument")?.map(Token::assume_identifier)
     };
     (@parse_argument; $self:ident; Token::Label) => {
         {
-            let label = $self.try_eat(Token::Label(""))?.map(Token::assume_label);
+            let label = $self.eat(Token::Label(""), "Expected label for argument")?.map(Token::assume_label);
             let span = label.span();
             $crate::ast::Label { name: label }.at(span)
         }
     };
     (@parse_argument; $self:ident; Token::FunctionName) => {
-        $self.try_eat(Token::FunctionName(""))?.map(Token::assume_function_name)
+        $self.eat(Token::FunctionName(""), "Expected function name for argument")?.map(Token::assume_function_name)
     };
     (@parse_argument; $self:ident; Vec::from) => {
         {
             let mut arguments = vec![];
             while !$self.is_eof() && !$self.is_at(&Token::Semi) {
-                arguments.push($self.eat(Token::Identifier(""), "Only variable names are valid variadic arguments").ok()?.map(Token::assume_identifier))
+                arguments.push($self.eat(Token::Identifier(""), "Only variable names are valid variadic arguments")?.map(Token::assume_identifier))
             }
             arguments
         }
@@ -77,8 +77,7 @@ macro_rules! try_op {
         $op_name:ident:$name:literal =>
         $enum:ident::$variant:ident$(($($argument_name:ident as $scope:ident::$token:ident),*))?
     ) => {
-        #[allow(clippy::redundant_closure_call)]
-        if let Some((op, end)) = (|| -> Option<($crate::ast::$enum, $crate::loc::Span)> {
+        if $op_name.inner == $name {
             #[allow(unused_assignments)]
             #[allow(unused_mut)]
             let mut end = $op_name.span();
@@ -88,12 +87,8 @@ macro_rules! try_op {
                     end = span;
                 }
             )*)*
-            Some((
-                $crate::ast::$enum::$variant $(($($argument_name),*))*,
-                end
-            ))
-        })() {
-            return Ok(op.between($op_name, end))
+            let op = $crate::ast::$enum::$variant $(($($argument_name),*))*;
+            return Ok(op.between($op_name, end));
         }
     };
 }
@@ -457,13 +452,15 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
     pub fn parse_effect_operation_op(
         &mut self,
     ) -> Result<Loc<ast::EffectOperationOp<'source>>> {
-        let op_name = self.eat(
-            Token::Identifier(""),
-            "Missing operation name for effect operation",
-        )?;
+        let op_name = self
+            .eat(
+                Token::Identifier(""),
+                "Missing operation name for effect operation",
+            )?
+            .map(Token::assume_identifier);
 
         try_op!(self; op_name: "jmp" => EffectOperationOp::Jmp(destination as Token::Label));
-        try_op!(self; op_name: "br" => EffectOperationOp::Br(if_true as Token::Label, if_false as Token::Label));
+        try_op!(self; op_name: "br" => EffectOperationOp::Br(condition as Token::Identifier, if_true as Token::Label, if_false as Token::Label));
         try_op!(self; op_name: "call" => EffectOperationOp::Call(destination as Token::FunctionName, arguments as Vec::from));
         try_op!(self; op_name: "ret" => EffectOperationOp::Ret);
         try_op!(self; op_name: "print" => EffectOperationOp::Print(value as Vec::from));
