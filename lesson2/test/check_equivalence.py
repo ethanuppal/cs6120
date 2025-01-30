@@ -6,7 +6,8 @@ import sys, os, subprocess, json, multiprocessing
 def parse_args():
     package = sys.argv[1]
     executable = sys.argv[2]
-    args = sys.argv[3:]
+    transformer = sys.argv[3]
+    args = sys.argv[4:]
     filenames = []
     exclude = []
     all_are_args = False
@@ -27,6 +28,7 @@ def parse_args():
     return (
         package,
         executable,
+        transformer,
         [filename for filename in filenames if filename not in exclude],
     )
 
@@ -37,14 +39,14 @@ def init_worker(shared_event):
 
 
 def check_file(args):
-    (executable, filename) = args
+    (executable, transformer, filename) = args
     given_code = subprocess.check_output(
-        f"bril2json <{filename}", shell=True, stderr=subprocess.DEVNULL
+        f"{transformer} <{filename}", shell=True, stderr=subprocess.DEVNULL
     ).decode("utf-8")
     passthrough_code = subprocess.check_output(
         f"bril2json <{filename} | {executable} | bril2json",
         shell=True,
-        stderr=subprocess.DEVNULL,
+        # stderr=subprocess.DEVNULL,
     ).decode("utf-8")
     given_bril = json.loads(given_code)
     passthrough_bril = json.loads(passthrough_code)
@@ -61,7 +63,7 @@ if __name__ == "__main__":
         print("Run from lesson2/")
         sys.exit(1)
 
-    package, executable, filenames = parse_args()
+    package, executable, transformer, filenames = parse_args()
 
     print(f"Rebuilding {package}")
     os.system(f"cargo build --package {package}")
@@ -77,7 +79,8 @@ if __name__ == "__main__":
         ) as pool:
             try:
                 pool.imap_unordered(
-                    check_file, [(executable, filename) for filename in filenames]
+                    check_file,
+                    [(executable, transformer, filename) for filename in filenames],
                 )
                 pool.close()
                 pool.join()

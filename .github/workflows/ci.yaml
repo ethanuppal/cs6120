@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
       - name: Integration tests
         run: cargo test -p bril-frontend
@@ -37,7 +38,7 @@ jobs:
       - name: Test correct parsing
         run: |
           cd lesson2
-          python3 test/check_equivalence.py bril-frontend ../target/debug/examples/print \
+          python3 test/check_equivalence.py "bril-frontend --example print" "../target/debug/examples/print -" \
             ../bril/benchmarks/**/*.bril \
             --exclude ../bril/benchmarks/float/cordic.bril
 
@@ -45,6 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
       - name: Clone Bril
         run: git clone https://github.com/sampsyo/bril
@@ -72,6 +74,6 @@ jobs:
       - name: Test build-cfg
         run: |
           cd lesson2
-          python3 test/check_equivalence.py build-cfg "../target/debug/build-cfg --mode passthrough" \
+          python3 test/check_equivalence.py build-cfg "../target/debug/build-cfg --mode passthrough" bril2json \
           ../bril/benchmarks/**/*.bril \
             --exclude ../bril/benchmarks/float/cordic.bril
