@@ -9,28 +9,47 @@ on:
      - main
 
 env:
-  CARGO_INCREMENTAL: 0
+  CARGO_INCREMENTAL: 1
 
 jobs:
   bril_frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
-      - name: Test
+      - name: Integration tests
         run: cargo test -p bril-frontend
+
+      - name: Clone Bril
+        run: git clone https://github.com/sampsyo/bril
+
+      - uses: actions/setup-python@v4
+        with:
+            python-version: '3.11'
+            cache: pip
+            cache-dependency-path: /bril/bril-txt/pyproject.toml
+
+      - name: Install Flit
+        run: pip install flit
+      - name: Install Python tools
+        run: cd bril/bril-txt ; flit install --symlink
+
+      - name: Test correct parsing
+        run: |
+          cd lesson2
+          python3 test/check_equivalence.py "bril-frontend --example print" "../target/debug/examples/print -" "cat" \
+            ../bril/benchmarks/**/*.bril \
+            --exclude ../bril/benchmarks/float/cordic.bril
 
   lesson2:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
       - name: Clone Bril
         run: git clone https://github.com/sampsyo/bril
-
-      - uses: denoland/setup-deno@v1
-        with:
-          deno-version: v1.x
 
       - uses: actions/setup-python@v4
         with:
@@ -55,6 +74,6 @@ jobs:
       - name: Test build-cfg
         run: |
           cd lesson2
-          python3 test/check_equivalence.py \
+          python3 test/check_equivalence.py build-cfg "../target/debug/build-cfg --mode passthrough" bril2json \
           ../bril/benchmarks/**/*.bril \
             --exclude ../bril/benchmarks/float/cordic.bril

@@ -57,6 +57,7 @@ pub struct Label<'a> {
 
 pub enum Type {
     Int,
+    Bool,
     Float,
     Char,
     Ptr(Box<Loc<Type>>),
@@ -75,6 +76,7 @@ pub enum Instruction<'a> {
 
 pub enum ConstantValue {
     IntegerLiteral(Loc<i64>),
+    BooleanLiteral(Loc<bool>),
     FloatLiteral(Loc<f64>),
     CharacterLiteral(Loc<char>),
 }
@@ -104,6 +106,8 @@ pub enum ValueOperationOp<'a> {
     And(Loc<&'a str>, Loc<&'a str>),
     Or(Loc<&'a str>, Loc<&'a str>),
 
+    /// Value-operation version.
+    Call(Loc<&'a str>, Vec<Loc<&'a str>>),
     Id(Loc<&'a str>),
 }
 
@@ -118,8 +122,9 @@ pub struct ValueOperation<'a> {
 pub enum EffectOperationOp<'a> {
     Jmp(Loc<Label<'a>>),
     Br(Loc<&'a str>, Loc<Label<'a>>, Loc<Label<'a>>),
+    /// Effect-operation version.
     Call(Loc<&'a str>, Vec<Loc<&'a str>>),
-    Ret,
+    Ret(Option<Loc<&'a str>>),
 
     Print(Vec<Loc<&'a str>>),
     Nop,

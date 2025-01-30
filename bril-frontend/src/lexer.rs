@@ -25,6 +25,9 @@ pub fn extract_character_from_token(slice: &str) -> Option<char> {
 #[derive(Logos, Debug)]
 #[logos(skip r"[ \t\n\f]+")]
 pub enum Token<'a> {
+    #[regex(r"#[^\n]*\n", logos::skip)]
+    Comment,
+
     #[token("import")]
     Import,
     #[token("from")]
@@ -36,7 +39,7 @@ pub enum Token<'a> {
     FunctionName(&'a str),
     #[regex(r"[\p{XID_Start}_]\p{XID_Continue}*")]
     Identifier(&'a str),
-    #[regex(r"\.[\p{XID_Start}_]\p{XID_Continue}*")]
+    #[regex(r"\.[\p{XID_Start}_][\p{XID_Continue}\.]*")]
     Label(&'a str),
     #[regex(r#""(?:[^"]|\\")*""#, |lexer| extract_string_from_token(lexer.slice()))]
     Path(&'a str),
@@ -62,17 +65,22 @@ pub enum Token<'a> {
     #[token("=")]
     Equals,
 
-    #[regex("[0-9][0-9]*", |lexer| lexer.slice().parse().ok())]
+    #[regex("-?[0-9][0-9]*", |lexer| lexer.slice().parse().ok())]
     Integer(i64),
-    #[regex(r"[0-9][0-9]*\.[0-9][0-9]*", |lexer| lexer.slice().parse().ok())]
+    #[regex(r"-?[0-9][0-9]*\.[0-9][0-9]*", |lexer| lexer.slice().parse().ok())]
     Float(f64),
     #[regex("'.'", |lexer| extract_character_from_token(lexer.slice()))]
     Character(char),
+    #[token("true")]
+    True,
+    #[token("false")]
+    False,
 }
 
 impl Token<'_> {
     pub fn pattern_name(&self) -> &'static str {
         match self {
+            Self::Comment => unreachable!(),
             Self::Import => "import",
             Self::From => "from",
             Self::As => "as",
@@ -93,6 +101,8 @@ impl Token<'_> {
             Self::Integer(_) => "integer",
             Self::Float(_) => "float",
             Self::Character(_) => "character",
+            Self::True => "true literal",
+            Self::False => "false literal",
         }
     }
 }
@@ -121,6 +131,8 @@ impl<'a> Token<'a> {
                 | (Self::Integer(_), Self::Integer(_))
                 | (Self::Float(_), Self::Float(_))
                 | (Self::Character(_), Self::Character(_))
+                | (Self::True, Self::True)
+                | (Self::False, Self::False)
         )
     }
 
@@ -174,9 +186,10 @@ impl<'a> Token<'a> {
     }
 }
 
-impl<'a> Clone for Token<'a> {
+impl Clone for Token<'_> {
     fn clone(&self) -> Self {
         match self {
+            Self::Comment => unreachable!(),
             Self::Import => Self::Import,
             Self::From => Self::From,
             Self::As => Self::As,
@@ -199,6 +212,8 @@ impl<'a> Clone for Token<'a> {
             Self::Integer(integer) => Self::Integer(*integer),
             Self::Float(float) => Self::Float(*float),
             Self::Character(character) => Self::Character(*character),
+            Self::True => Self::True,
+            Self::False => Self::False,
         }
     }
 }

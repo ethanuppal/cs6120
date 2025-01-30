@@ -127,3 +127,13 @@ impl<T: Spanned> MaybeSpanned for Vec<T> {
         }
     }
 }
+
+impl<T: Spanned> MaybeSpanned for Option<T> {
+    fn try_span(&self) -> Option<Span> {
+        if let Some(inner) = self {
+            Some(inner.span())
+        } else {
+            None
+        }
+    }
+}
