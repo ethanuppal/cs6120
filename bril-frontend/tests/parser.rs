@@ -31,7 +31,7 @@ macro_rules! parser_snapshot {
             };
 
             let mut buffer = String::new();
-            bril_frontend::printer::Printer::new(&code, &mut buffer, 2)
+            bril_frontend::printer::Printer::new(&mut buffer, 2)
                 .print_program(&program)
                 .expect("Failed to print program");
 

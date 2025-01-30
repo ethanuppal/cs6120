@@ -72,6 +72,15 @@ macro_rules! try_op {
             arguments
         }
     };
+    (@parse_argument; $self:ident; Option::from) => {
+        {
+            if !$self.is_eof() && !$self.is_at(&Token::Semi) {
+                Some($self.eat(Token::Identifier(""), "Only variable names are valid optional arguments")?.map(Token::assume_identifier))
+            } else {
+                None
+            }
+        }
+    };
     (
         $self:ident;
         $op_name:ident:$name:literal =>
@@ -418,6 +427,7 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         try_op!(self; op_name: "not" => ValueOperationOp::Not(value as Token::Identifier));
         try_op!(self; op_name: "and" => ValueOperationOp::And(lhs as Token::Identifier, rhs as Token::Identifier));
         try_op!(self; op_name: "or" => ValueOperationOp::Or(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "call" => ValueOperationOp::Call(destination as Token::FunctionName, arguments as Vec::from));
         try_op!(self; op_name: "id" => ValueOperationOp::Id(value as Token::Identifier));
 
         Err(())
@@ -462,7 +472,7 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         try_op!(self; op_name: "jmp" => EffectOperationOp::Jmp(destination as Token::Label));
         try_op!(self; op_name: "br" => EffectOperationOp::Br(condition as Token::Identifier, if_true as Token::Label, if_false as Token::Label));
         try_op!(self; op_name: "call" => EffectOperationOp::Call(destination as Token::FunctionName, arguments as Vec::from));
-        try_op!(self; op_name: "ret" => EffectOperationOp::Ret);
+        try_op!(self; op_name: "ret" => EffectOperationOp::Ret(value as Option::from));
         try_op!(self; op_name: "print" => EffectOperationOp::Print(value as Vec::from));
         try_op!(self; op_name: "nop" => EffectOperationOp::Nop);
 
@@ -569,6 +579,7 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
 
         Ok(match ty.inner {
             "int" => ast::Type::Int.at(ty),
+            "bool" => ast::Type::Bool.at(ty),
             "float" => ast::Type::Float.at(ty),
             "char" => ast::Type::Char.at(ty),
             "ptr" => {

@@ -66,7 +66,7 @@ fn main() -> Result<(), Whatever> {
     };
 
     let mut buffer = String::new();
-    Printer::new(&contents, &mut buffer, 2)
+    Printer::new(&mut buffer, 2)
         .print_program(&program)
         .whatever_context("Failed to format program")?;
     print!("{}", buffer);

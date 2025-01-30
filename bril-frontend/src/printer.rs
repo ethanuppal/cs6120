@@ -18,19 +18,13 @@ use inform::common::IndentWriterCommon;
 
 use crate::ast;
 
-pub struct Printer<'source, 'writer, W: fmt::Write> {
+pub struct Printer<'writer, W: fmt::Write> {
     w: inform::fmt::IndentWriter<'writer, W>,
-    source: &'source str,
 }
 
-impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
-    pub fn new(
-        source: &'source str,
-        writer: &'writer mut W,
-        indent: usize,
-    ) -> Self {
+impl<'writer, W: fmt::Write> Printer<'writer, W> {
+    pub fn new(writer: &'writer mut W, indent: usize) -> Self {
         Self {
-            source,
             w: inform::fmt::IndentWriter::new(writer, indent),
         }
     }
@@ -74,6 +68,7 @@ impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
     pub fn print_type(&mut self, ty: &ast::Type) -> fmt::Result {
         match ty {
             ast::Type::Int => write!(self.w, "int"),
+            ast::Type::Bool => write!(self.w, "bool"),
             ast::Type::Float => write!(self.w, "float"),
             ast::Type::Char => write!(self.w, "char"),
             ast::Type::Ptr(inner) => {
@@ -103,6 +98,9 @@ impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
         match constant_value {
             ast::ConstantValue::IntegerLiteral(integer) => {
                 write!(self.w, "{}", integer)
+            }
+            ast::ConstantValue::BooleanLiteral(boolean) => {
+                write!(self.w, "{}", boolean)
             }
             ast::ConstantValue::FloatLiteral(float) => {
                 write!(self.w, "{}", float)
@@ -164,6 +162,18 @@ impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
             ast::ValueOperationOp::Or(lhs, rhs) => {
                 write!(self.w, "or {} {}", lhs, rhs)
             }
+            ast::ValueOperationOp::Call(function_name, arguments) => {
+                write!(
+                    self.w,
+                    "call {} {}",
+                    function_name,
+                    arguments
+                        .iter()
+                        .map(|argument| argument.to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            }
             ast::ValueOperationOp::Id(value) => {
                 write!(self.w, "id {}", value)
             }
@@ -210,7 +220,13 @@ impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
                         .join(" ")
                 )
             }
-            ast::EffectOperationOp::Ret => write!(self.w, "ret"),
+            ast::EffectOperationOp::Ret(value) => {
+                write!(self.w, "ret")?;
+                if let Some(value) = value {
+                    write!(self.w, " {}", value)?;
+                }
+                Ok(())
+            }
             ast::EffectOperationOp::Print(arguments) => {
                 write!(
                     self.w,
@@ -307,7 +323,7 @@ impl<'source, 'writer, W: fmt::Write> Printer<'source, 'writer, W> {
         }
 
         for function in &program.functions {
-            self.print_function(function);
+            self.print_function(function)?;
         }
 
         Ok(())

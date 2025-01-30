@@ -4,7 +4,9 @@ import sys, os, subprocess, json, multiprocessing
 
 
 def parse_args():
-    args = sys.argv[1:]
+    package = sys.argv[1]
+    executable = sys.argv[2]
+    args = sys.argv[3:]
     filenames = []
     exclude = []
     all_are_args = False
@@ -22,7 +24,11 @@ def parse_args():
                 next_is_exclude = False
             else:
                 filenames.append(arg)
-    return [filename for filename in filenames if filename not in exclude]
+    return (
+        package,
+        executable,
+        [filename for filename in filenames if filename not in exclude],
+    )
 
 
 def init_worker(shared_event):
@@ -30,14 +36,14 @@ def init_worker(shared_event):
     event = shared_event
 
 
-def check_file(filename):
+def check_file(args):
+    (executable, filename) = args
     given_code = subprocess.check_output(
         f"bril2json <{filename}", shell=True, stderr=subprocess.DEVNULL
     ).decode("utf-8")
     passthrough_code = subprocess.check_output(
-        f"bril2json <{filename} | ../target/debug/build-cfg --mode passthrough | bril2json",
+        f"bril2json <{filename} | {executable} --mode passthrough | bril2json",
         shell=True,
-        stderr=subprocess.DEVNULL,
     ).decode("utf-8")
     given_bril = json.loads(given_code)
     passthrough_bril = json.loads(passthrough_code)
@@ -54,10 +60,10 @@ if __name__ == "__main__":
         print("Run from lesson2/")
         sys.exit(1)
 
-    print("Rebuilding build-cfg")
-    os.system("cargo build --package build-cfg")
+    package, executable, filenames = parse_args()
 
-    filenames = parse_args()
+    print(f"Rebuilding {package}")
+    os.system(f"cargo build --package {package}")
 
     # https://superfastpython.com/multiprocessing-pool-stop-all-tasks-on-failure/
     with multiprocessing.Manager() as manager:
@@ -69,7 +75,9 @@ if __name__ == "__main__":
             initargs=(shared_event,),
         ) as pool:
             try:
-                pool.imap_unordered(check_file, filenames)
+                pool.imap_unordered(
+                    check_file, [(executable, filename) for filename in filenames]
+                )
                 pool.close()
                 pool.join()
                 if shared_event.is_set():
