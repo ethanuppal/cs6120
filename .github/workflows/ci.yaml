@@ -8,7 +8,18 @@ on:
     branches:
      - main
 
+env:
+  CARGO_INCREMENTAL: 0
+
 jobs:
+  bril_frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test
+        run: cargo test -p bril-frontend
+
   lesson2:
     runs-on: ubuntu-latest
     steps:
