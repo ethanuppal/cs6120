@@ -196,6 +196,13 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         goals: impl IntoIterator<Item = Token<'source>>,
         message: impl Into<String>,
     ) {
+        assert!(
+            !self.diagnostics.is_empty(),
+            "INTERNAL BUG: Cannot recover
+         without first reporting an error in self.diagnostics"
+        );
+
+        let current = self.get(0).unwrap().span();
         let mut goals = goals.into_iter();
         while !self.is_eof() {
             if goals.any(|goal| self.is_at(&goal)) {
@@ -204,7 +211,9 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
             self.index += 1;
         }
 
-        self.diagnostics.push(Diagnostic::new(message));
+        self.diagnostics.push(
+            Diagnostic::new(message).label("Recovery started here", current),
+        );
     }
 
     pub fn parse_separated<'a, U, F: FnMut(&mut Self) -> Result<U>>(
@@ -373,6 +382,12 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
                 character.map(Token::assume_character),
             )
             .at(span))
+        } else if let Some(true_literal) = self.try_eat(Token::True) {
+            let span = true_literal.span();
+            Ok(ast::ConstantValue::BooleanLiteral(true.at(&span)).at(span))
+        } else if let Some(false_literal) = self.try_eat(Token::False) {
+            let span = false_literal.span();
+            Ok(ast::ConstantValue::BooleanLiteral(false.at(&span)).at(span))
         } else {
             self.diagnostics.push(Diagnostic::new(
                 "Unknown constant value: expected integer, float, or character")
@@ -421,6 +436,7 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         try_op!(self; op_name: "sub" => ValueOperationOp::Sub(lhs as Token::Identifier, rhs as Token::Identifier));
         try_op!(self; op_name: "div" => ValueOperationOp::Div(lhs as Token::Identifier, rhs as Token::Identifier));
         try_op!(self; op_name: "eq" => ValueOperationOp::Eq(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "lt" => ValueOperationOp::Lt(lhs as Token::Identifier, rhs as Token::Identifier));
         try_op!(self; op_name: "gt" => ValueOperationOp::Gt(lhs as Token::Identifier, rhs as Token::Identifier));
         try_op!(self; op_name: "le" => ValueOperationOp::Le(lhs as Token::Identifier, rhs as Token::Identifier));
         try_op!(self; op_name: "ge" => ValueOperationOp::Ge(lhs as Token::Identifier, rhs as Token::Identifier));
@@ -429,6 +445,13 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         try_op!(self; op_name: "or" => ValueOperationOp::Or(lhs as Token::Identifier, rhs as Token::Identifier));
         try_op!(self; op_name: "call" => ValueOperationOp::Call(destination as Token::FunctionName, arguments as Vec::from));
         try_op!(self; op_name: "id" => ValueOperationOp::Id(value as Token::Identifier));
+
+        self.diagnostics.push(
+            Diagnostic::new("Unknown value operation").label(
+                "Could not parse identifier as value operation",
+                op_name,
+            ),
+        );
 
         Err(())
     }
@@ -475,6 +498,13 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         try_op!(self; op_name: "ret" => EffectOperationOp::Ret(value as Option::from));
         try_op!(self; op_name: "print" => EffectOperationOp::Print(value as Vec::from));
         try_op!(self; op_name: "nop" => EffectOperationOp::Nop);
+
+        self.diagnostics.push(
+            Diagnostic::new("Unknown effect operation").label(
+                "Could not parse identifier as value operation",
+                op_name,
+            ),
+        );
 
         Err(())
     }

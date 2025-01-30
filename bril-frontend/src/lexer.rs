@@ -65,12 +65,16 @@ pub enum Token<'a> {
     #[token("=")]
     Equals,
 
-    #[regex("[0-9][0-9]*", |lexer| lexer.slice().parse().ok())]
+    #[regex("-?[0-9][0-9]*", |lexer| lexer.slice().parse().ok())]
     Integer(i64),
-    #[regex(r"[0-9][0-9]*\.[0-9][0-9]*", |lexer| lexer.slice().parse().ok())]
+    #[regex(r"-?[0-9][0-9]*\.[0-9][0-9]*", |lexer| lexer.slice().parse().ok())]
     Float(f64),
     #[regex("'.'", |lexer| extract_character_from_token(lexer.slice()))]
     Character(char),
+    #[token("true")]
+    True,
+    #[token("false")]
+    False,
 }
 
 impl Token<'_> {
@@ -97,6 +101,8 @@ impl Token<'_> {
             Self::Integer(_) => "integer",
             Self::Float(_) => "float",
             Self::Character(_) => "character",
+            Self::True => "true literal",
+            Self::False => "false literal",
         }
     }
 }
@@ -125,6 +131,8 @@ impl<'a> Token<'a> {
                 | (Self::Integer(_), Self::Integer(_))
                 | (Self::Float(_), Self::Float(_))
                 | (Self::Character(_), Self::Character(_))
+                | (Self::True, Self::True)
+                | (Self::False, Self::False)
         )
     }
 
@@ -204,6 +212,8 @@ impl Clone for Token<'_> {
             Self::Integer(integer) => Self::Integer(*integer),
             Self::Float(float) => Self::Float(*float),
             Self::Character(character) => Self::Character(*character),
+            Self::True => Self::True,
+            Self::False => Self::False,
         }
     }
 }
