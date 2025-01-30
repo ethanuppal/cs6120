@@ -56,7 +56,6 @@ def check_file(args):
     else:
         print(f"\x1b[31;1m{filename} ERROR\x1b[m")
         event.set()
-        sys.exit(1)
 
 
 if __name__ == "__main__":

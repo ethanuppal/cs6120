@@ -39,7 +39,7 @@ pub enum Token<'a> {
     FunctionName(&'a str),
     #[regex(r"[\p{XID_Start}_]\p{XID_Continue}*")]
     Identifier(&'a str),
-    #[regex(r"\.[\p{XID_Start}_]\p{XID_Continue}*")]
+    #[regex(r"\.[\p{XID_Start}_][\p{XID_Continue}\.]*")]
     Label(&'a str),
     #[regex(r#""(?:[^"]|\\")*""#, |lexer| extract_string_from_token(lexer.slice()))]
     Path(&'a str),
