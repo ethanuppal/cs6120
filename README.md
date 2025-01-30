@@ -21,3 +21,5 @@ The exceptions to this license are as follows:
 
 - [bril-lsp](./bril-lsp/) is licensed under the GNU General Public License, 
   Version 3.0.
+- [bril-frontend](./bril-frontend/) is licensed under the GNU General Public
+  License, Version 3.0.

@@ -1,8 +1,9 @@
 [package]
 name = "bril-frontend"
+description = "AST and type-checking for Bril programs"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+license = "GPL-3.0"
 
 [dependencies]
 logos.workspace = true
