@@ -4,5 +4,4 @@ from "a" import @b, @c as @d;
   v0: int = const 1;
   v1: int = const 2;
   v2: int = add v0 v1;
-  print v2;
 }

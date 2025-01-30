@@ -11,11 +11,7 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    fs,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
+use std::{fs, path::PathBuf, sync::Arc};
 
 use bril_frontend::{
     ast::{Instruction, Type},
@@ -242,8 +238,9 @@ impl Backend {
         position: &Position,
     ) -> Option<(LspSymbol, Span)> {
         let lsp_file_info = self.files.get(uri)?;
-        let byte_index = lsp_file_info.line_starts[position.line as usize]
-            + position.character as usize;
+        let byte_index =
+            lsp_file_info.line_starts.get(position.line as usize)?
+                + position.character as usize;
         lsp_file_info
             .hover_complete_symbols
             .iter()
@@ -257,8 +254,9 @@ impl Backend {
         position: &Position,
     ) -> Option<Vec<(LspSymbol, Span)>> {
         let lsp_file_info = self.files.get(uri)?;
-        let byte_index = lsp_file_info.line_starts[position.line as usize]
-            + position.character as usize;
+        let byte_index =
+            lsp_file_info.line_starts.get(position.line as usize)?
+                + position.character as usize;
         Some(
             lsp_file_info
                 .hover_complete_symbols
@@ -580,9 +578,20 @@ impl LanguageServer for Backend {
     ) -> jsonrpc::Result<InitializeResult> {
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
-                hover_provider: Some(HoverProviderCapability::Simple(true)),
+                hover_provider: Some(HoverProviderCapability::Simple(false)),
                 completion_provider: Some(CompletionOptions::default()),
                 document_symbol_provider: Some(OneOf::Left(true)),
+                text_document_sync: Some(TextDocumentSyncCapability::Options(
+                    TextDocumentSyncOptions {
+                        open_close: Some(true),
+                        change: Some(TextDocumentSyncKind::FULL),
+                        will_save: None,
+                        will_save_wait_until: None,
+                        save: Some(TextDocumentSyncSaveOptions::Supported(
+                            true,
+                        )),
+                    },
+                )),
                 ..Default::default()
             },
             ..Default::default()

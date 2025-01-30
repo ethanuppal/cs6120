@@ -12,7 +12,7 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{env, fs, io, path::PathBuf};
+use std::{env, fs, io};
 
 use annotate_snippets::{Level, Renderer, Snippet};
 use bril_frontend::{lexer::Token, loc::Loc, parser::Parser, printer::Printer};

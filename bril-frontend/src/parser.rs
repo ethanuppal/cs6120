@@ -18,6 +18,7 @@ use crate::{
     loc::{Loc, Span, Spanned, WithLocation},
 };
 
+#[derive(Debug)]
 pub struct Diagnostic {
     pub message: String,
     pub span: Span,
@@ -157,7 +158,8 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
 
     pub fn try_eat(&mut self, pattern: Token) -> Option<Loc<Token<'source>>> {
         if self.is_at(&pattern) {
-            let result = self.get(0).unwrap().clone();
+            let result =
+                self.get(0).expect("is_at is true so we're not EOF").clone();
             self.advance();
             Some(result)
         } else {
@@ -171,7 +173,8 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         message: impl Into<String>,
     ) -> Result<Loc<Token<'source>>> {
         if self.is_at(&pattern) {
-            let result = self.get(0).unwrap().clone();
+            let result =
+                self.get(0).expect("is_at is true so we're not EOF").clone();
             self.advance();
             Ok(result)
         } else {
@@ -211,11 +214,13 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
     ) {
         assert!(
             !self.diagnostics.is_empty(),
-            "INTERNAL BUG: Cannot recover
-         without first reporting an error in self.diagnostics"
+            "INTERNAL BUG: Cannot recover without first reporting an error in self.diagnostics"
         );
 
-        let current = self.get(0).unwrap().span();
+        let current = self
+            .get(0)
+            .map(|token| token.span())
+            .unwrap_or(self.eof_span());
         let mut goals = goals.into_iter();
         while !self.is_eof() {
             if goals.any(|goal| self.is_at(&goal)) {
@@ -699,7 +704,19 @@ self.get(0)
 
         let mut body = vec![];
         while !self.is_eof() && !self.is_at(&Token::RightBrace) {
-            body.push(self.parse_function_code()?);
+            let index = self.index;
+
+            if let Ok(code) = self.parse_function_code() {
+                body.push(code);
+            } else {
+                self.index = index;
+                self.recover([Token::Semi, Token::RightBrace], "Failed to find another label or instruction in this function body to recover from");
+                if self.is_eof() || self.is_at(&Token::RightBrace) {
+                    return Err(());
+                } else {
+                    self.advance();
+                }
+            }
         }
 
         let end =
@@ -743,6 +760,15 @@ self.get(0)
                     );
                 }
             } else {
+                self.diagnostics.push(
+                    Diagnostic::new(
+                        "Unexpected token",
+                        self.get(0).expect("We're not eof"),
+                    )
+                    .explain(
+                        "Top-level Bril constructs are imports or functions",
+                    ),
+                );
                 self.recover([Token::Import, Token::FunctionName("")],
                         "Failed to find another valid import or function to recover from",
                 );
