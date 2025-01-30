@@ -45,14 +45,18 @@ pub enum Token<'a> {
     LeftBrace,
     #[token("}")]
     RightBrace,
+    #[token("(")]
+    LeftPar,
+    #[token(")")]
+    RightPar,
     #[token(",")]
     Comma,
     #[token(":")]
     Colon,
     #[token("<")]
-    LessThan,
+    LeftAngle,
     #[token(">")]
-    GreaterThan,
+    RightAngle,
     #[token(";")]
     Semi,
     #[token("=")]
@@ -76,12 +80,14 @@ impl Token<'_> {
             Self::Identifier(_) => "identifier",
             Self::Label(_) => "label",
             Self::Path(_) => "path",
-            Self::LeftBrace => "}",
+            Self::LeftBrace => "(",
             Self::RightBrace => "}",
+            Self::LeftPar => "(",
+            Self::RightPar => ")",
             Self::Comma => ",",
             Self::Colon => ":",
-            Self::LessThan => "<",
-            Self::GreaterThan => ">",
+            Self::LeftAngle => "<",
+            Self::RightAngle => ">",
             Self::Semi => ";",
             Self::Equals => "=",
             Self::Integer(_) => "integer",
@@ -103,11 +109,13 @@ impl<'a> Token<'a> {
                 | (Self::Label(_), Self::Label(_))
                 | (Self::Path(_), Self::Path(_))
                 | (Self::LeftBrace, Self::LeftBrace)
-                | (Self::Comma, Self::Comma)
                 | (Self::RightBrace, Self::RightBrace)
+                | (Self::LeftPar, Self::LeftPar)
+                | (Self::RightPar, Self::RightPar)
+                | (Self::Comma, Self::Comma)
                 | (Self::Colon, Self::Colon)
-                | (Self::LessThan, Self::LessThan)
-                | (Self::GreaterThan, Self::GreaterThan)
+                | (Self::LeftAngle, Self::LeftAngle)
+                | (Self::RightAngle, Self::RightAngle)
                 | (Self::Semi, Self::Semi)
                 | (Self::Equals, Self::Equals)
                 | (Self::Integer(_), Self::Integer(_))
@@ -121,6 +129,20 @@ impl<'a> Token<'a> {
             panic!("Expected function name");
         };
         function_name
+    }
+
+    pub fn assume_identifier(self) -> &'a str {
+        let Self::Identifier(identifier) = self else {
+            panic!("Expected identifier");
+        };
+        identifier
+    }
+
+    pub fn assume_label(self) -> &'a str {
+        let Self::Label(label) = self else {
+            panic!("Expected label");
+        };
+        label
     }
 
     pub fn assume_path(self) -> &'a str {
@@ -145,10 +167,12 @@ impl<'a> Clone for Token<'a> {
             Self::Path(path) => Self::Path(path),
             Self::LeftBrace => Self::LeftBrace,
             Self::RightBrace => Self::RightBrace,
+            Self::LeftPar => Self::LeftPar,
+            Self::RightPar => Self::RightPar,
             Self::Comma => Self::Comma,
             Self::Colon => Self::Colon,
-            Self::LessThan => Self::LessThan,
-            Self::GreaterThan => Self::GreaterThan,
+            Self::LeftAngle => Self::LeftAngle,
+            Self::RightAngle => Self::RightAngle,
             Self::Semi => Self::Semi,
             Self::Equals => Self::Equals,
             Self::Integer(integer) => Self::Integer(*integer),

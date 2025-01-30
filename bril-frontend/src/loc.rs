@@ -88,6 +88,13 @@ impl<T> Spanned for &Loc<T> {
 }
 
 pub trait WithLocation {
+    fn at(self, spanned: impl Spanned) -> Loc<Self>
+    where
+        Self: Sized,
+    {
+        Loc::new(self, spanned.span())
+    }
+
     fn between(self, start: impl Spanned, end: impl Spanned) -> Loc<Self>
     where
         Self: Sized,

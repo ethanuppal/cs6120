@@ -69,24 +69,17 @@ macro_rules! lexer_error {
 
 lexer_snapshot! {
     all_tokens_work,
-    r#"import from as @main .foo foo "path/to/lol" {}:<>;= 5 5.0 'a'"#
+    r#"import from as @main .foo foo "path/to/lol" {}:<>;=,() 5 5.0 'a'"#
 }
 
 lexer_snapshot! {
     add_bril_lexes,
-    r#"
-@main {
-  v0: int = const 1;
-  v1: int = const 2;
-  v2: int = add v0 v1;
-  print v2;
-}
-    "#
+    include_str!("../bril-programs/add.bril")
 }
 
 lexer_snapshot! {
-    import_code,
-    include_str!("../program.bril")
+    import_bril_lexes,
+    include_str!("../bril-programs/import.bril")
 }
 
 lexer_error! {

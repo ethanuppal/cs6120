@@ -37,15 +37,18 @@ pub struct Import<'a> {
 }
 
 pub struct Function<'a> {
-    pub name: &'a str,
+    pub name: Loc<&'a str>,
     pub parameters: Vec<(Loc<&'a str>, Loc<TypeAnnotation>)>,
-    pub return_type: Option<Loc<Type>>,
+    pub return_type: Option<Loc<TypeAnnotation>>,
     pub body: Vec<Loc<FunctionCode<'a>>>,
 }
 
 pub enum FunctionCode<'a> {
-    Label(Label<'a>),
-    Instruction(Instruction<'a>),
+    Label {
+        label: Loc<Label<'a>>,
+        colon_token: Loc<()>,
+    },
+    Instruction(Loc<Instruction<'a>>),
 }
 
 pub struct Label<'a> {

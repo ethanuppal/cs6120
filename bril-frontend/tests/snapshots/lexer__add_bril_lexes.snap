@@ -3,151 +3,151 @@ source: bril-frontend/tests/lexer.rs
 expression: "LexerSnapshot { code, tokens }"
 ---
 LexerSnapshot {
-    code: "\n@main {\n  v0: int = const 1;\n  v1: int = const 2;\n  v2: int = add v0 v1;\n  print v2;\n}\n    ",
+    code: "@main {\n  v0: int = const 1;\n  v1: int = const 2;\n  v2: int = add v0 v1;\n  print v2;\n}\n",
     tokens: [
         Loc {
             inner: FunctionName(
                 "@main",
             ),
-            span: 1..6,
+            span: 0..5,
         },
         Loc {
             inner: LeftBrace,
-            span: 7..8,
+            span: 6..7,
         },
         Loc {
             inner: Identifier(
                 "v0",
             ),
-            span: 11..13,
+            span: 10..12,
         },
         Loc {
             inner: Colon,
-            span: 13..14,
+            span: 12..13,
         },
         Loc {
             inner: Identifier(
                 "int",
             ),
-            span: 15..18,
+            span: 14..17,
         },
         Loc {
             inner: Equals,
-            span: 19..20,
+            span: 18..19,
         },
         Loc {
             inner: Identifier(
                 "const",
             ),
-            span: 21..26,
+            span: 20..25,
         },
         Loc {
             inner: Integer(
                 1,
             ),
-            span: 27..28,
+            span: 26..27,
         },
         Loc {
             inner: Semi,
-            span: 28..29,
+            span: 27..28,
         },
         Loc {
             inner: Identifier(
                 "v1",
             ),
-            span: 32..34,
+            span: 31..33,
         },
         Loc {
             inner: Colon,
-            span: 34..35,
+            span: 33..34,
         },
         Loc {
             inner: Identifier(
                 "int",
             ),
-            span: 36..39,
+            span: 35..38,
         },
         Loc {
             inner: Equals,
-            span: 40..41,
+            span: 39..40,
         },
         Loc {
             inner: Identifier(
                 "const",
             ),
-            span: 42..47,
+            span: 41..46,
         },
         Loc {
             inner: Integer(
                 2,
             ),
-            span: 48..49,
+            span: 47..48,
         },
         Loc {
             inner: Semi,
-            span: 49..50,
+            span: 48..49,
         },
         Loc {
             inner: Identifier(
                 "v2",
             ),
-            span: 53..55,
+            span: 52..54,
         },
         Loc {
             inner: Colon,
-            span: 55..56,
+            span: 54..55,
         },
         Loc {
             inner: Identifier(
                 "int",
             ),
-            span: 57..60,
+            span: 56..59,
         },
         Loc {
             inner: Equals,
-            span: 61..62,
+            span: 60..61,
         },
         Loc {
             inner: Identifier(
                 "add",
             ),
-            span: 63..66,
+            span: 62..65,
         },
         Loc {
             inner: Identifier(
                 "v0",
             ),
-            span: 67..69,
+            span: 66..68,
         },
         Loc {
             inner: Identifier(
                 "v1",
             ),
-            span: 70..72,
+            span: 69..71,
         },
         Loc {
             inner: Semi,
-            span: 72..73,
+            span: 71..72,
         },
         Loc {
             inner: Identifier(
                 "print",
             ),
-            span: 76..81,
+            span: 75..80,
         },
         Loc {
             inner: Identifier(
                 "v2",
             ),
-            span: 82..84,
+            span: 81..83,
         },
         Loc {
             inner: Semi,
-            span: 84..85,
+            span: 83..84,
         },
         Loc {
             inner: RightBrace,
-            span: 86..87,
+            span: 85..86,
         },
     ],
 }

@@ -64,11 +64,6 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
             .unwrap_or(0..0)
     }
 
-    pub fn current(&self) -> &Loc<Token<'source>> {
-        self.get(0)
-            .expect("Unexpected EOF when accessing current token")
-    }
-
     pub fn get(&self, offset: usize) -> Option<&Loc<Token<'source>>> {
         if self.index + offset < self.tokens.len() {
             Some(&self.tokens[self.index + offset])
@@ -77,17 +72,19 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         }
     }
 
+    pub fn is_at(&self, pattern: &Token) -> bool {
+        self.get(0)
+            .filter(|token| token.matches_against(pattern.clone()))
+            .is_some()
+    }
+
     pub fn advance(&mut self) {
         self.index += 1;
     }
 
     pub fn try_eat(&mut self, pattern: Token) -> Option<Loc<Token<'source>>> {
-        if self
-            .get(0)
-            .filter(|token| token.matches_against(pattern))
-            .is_some()
-        {
-            let result = self.current().clone();
+        if self.is_at(&pattern) {
+            let result = self.get(0).unwrap().clone();
             self.advance();
             Some(result)
         } else {
@@ -100,12 +97,8 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         pattern: Token,
         message: impl Into<String>,
     ) -> Result<Loc<Token<'source>>> {
-        if self
-            .get(0)
-            .filter(|token| token.matches_against(pattern.clone()))
-            .is_some()
-        {
-            let result = self.current().clone();
+        if self.is_at(&pattern) {
+            let result = self.get(0).unwrap().clone();
             self.advance();
             Ok(result)
         } else {
@@ -141,7 +134,7 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
     ) {
         let mut goals = goals.into_iter();
         while !self.is_eof() {
-            if goals.any(|goal| self.current().matches_against(goal)) {
+            if goals.any(|goal| self.is_at(&goal)) {
                 return;
             }
             self.index += 1;
@@ -178,7 +171,7 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
                 if separators
                     .iter()
                     .cloned()
-                    .any(|separator| self.current().matches_against(separator))
+                    .any(|separator| self.is_at(&separator))
                 {
                     self.advance();
                 } else {
@@ -254,11 +247,11 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
             );
         }
 
-        let start = name.span.clone();
+        let start = name.span();
         let end = alias
             .as_ref()
-            .map(|alias| alias.span.clone())
-            .unwrap_or(name.span.clone());
+            .map(|alias| alias.span())
+            .unwrap_or(name.span());
         Ok(ast::ImportedFunction { name, alias }.between(start, end))
     }
 
@@ -290,6 +283,133 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
         .between(&from_token, &terminator))
     }
 
+    pub fn parse_label(&mut self) -> Result<Loc<ast::Label<'source>>> {
+        let name = self
+            .eat(Token::Label(""), "Expected label")?
+            .map(Token::assume_label);
+        let span = name.span();
+        Ok(ast::Label { name }.at(span))
+    }
+
+    pub fn parse_instruction(
+        &mut self,
+    ) -> Result<Loc<ast::Instruction<'source>>> {
+        todo!()
+    }
+
+    pub fn parse_function_code(
+        &mut self,
+    ) -> Result<Loc<ast::FunctionCode<'source>>> {
+        if self.is_at(&Token::Label("")) {
+            let label = self.parse_label()?;
+            let colon_token = self
+                .eat(Token::Colon, "Expected colon after label in function")?
+                .without_inner();
+            let start = label.span();
+            let end = colon_token.span();
+            Ok(ast::FunctionCode::Label { label, colon_token }
+                .between(start, end))
+        } else {
+            let instruction = self.parse_instruction()?;
+            let span = instruction.span();
+            Ok(ast::FunctionCode::Instruction(instruction).at(span))
+        }
+    }
+
+    pub fn parse_type(&mut self) -> Result<Loc<ast::Type>> {
+        let ty = self
+            .eat(Token::Identifier(""), "Expected type")?
+            .map(Token::assume_identifier);
+
+        Ok(match ty.inner {
+            "int" => ast::Type::Int.at(ty),
+            "float" => ast::Type::Float.at(ty),
+            "char" => ast::Type::Char.at(ty),
+            "ptr" => {
+                self.eat(
+                    Token::LeftAngle,
+                    "Missing inner type for pointer type",
+                )?;
+                let inner = self.parse_type()?;
+                let end = self.eat(
+                    Token::RightAngle,
+                    "Missing right angle after pointer inner type",
+                )?;
+                ast::Type::Ptr(Box::new(inner)).between(ty, end)
+            }
+            _ => {
+                self.diagnostics.push(Diagnostic::new("Unknown type", ty));
+                return Err(());
+            }
+        })
+    }
+
+    pub fn parse_type_annotation(
+        &mut self,
+    ) -> Result<Loc<ast::TypeAnnotation>> {
+        let colon_token = self
+            .eat(
+                Token::Colon,
+                format!("Need colon before type in type annotation"),
+            )?
+            .without_inner();
+        let ty = self.parse_type()?;
+        let start = colon_token.span();
+        let end = ty.span();
+        Ok(ast::TypeAnnotation { colon_token, ty }.between(start, end))
+    }
+
+    pub fn parse_function_parameter(
+        &mut self,
+    ) -> Result<(Loc<&'source str>, Loc<ast::TypeAnnotation>)> {
+        let name = self
+            .eat(Token::Identifier(""), "Expected parameter name")?
+            .map(Token::assume_identifier);
+        let annotation = self.parse_type_annotation()?;
+        Ok((name, annotation))
+    }
+
+    pub fn parse_function(
+        &mut self,
+        name: Loc<&'source str>,
+    ) -> Result<Loc<ast::Function<'source>>> {
+        let parameters = if self.try_eat(Token::LeftPar).is_some() {
+            self.parse_separated(
+                Self::parse_function_parameter,
+                [Token::Comma],
+                [Token::RightPar],
+                "Failed to parse function parameters",
+            )?
+            .0
+        } else {
+            vec![]
+        };
+
+        let return_type = if self.is_at(&Token::Colon) {
+            Some(self.parse_type_annotation()?)
+        } else {
+            None
+        };
+
+        self.eat(Token::LeftBrace, "Missing left brace to open function")?;
+
+        let mut body = vec![];
+        while !self.is_eof() && !self.is_at(&Token::RightBrace) {
+            body.push(self.parse_function_code()?);
+        }
+
+        let end =
+            self.eat(Token::RightBrace, "Missing left brace to open function")?;
+
+        Ok(ast::Function {
+            name: name.clone(),
+            parameters,
+            return_type,
+            body,
+        }
+        .between(name, end))
+    }
+
     pub fn parse_program(&mut self) -> Result<ast::Program<'source>> {
         let mut imports = vec![];
         let mut functions = vec![];
@@ -308,6 +428,16 @@ impl<'tokens, 'source: 'tokens> Parser<'tokens, 'source> {
             } else if let Some(function_name) =
                 self.try_eat(Token::FunctionName(""))
             {
+                if let Ok(function) = self.parse_function(
+                    function_name.map(Token::assume_function_name),
+                ) {
+                    functions.push(function);
+                } else {
+                    self.recover(
+                        [Token::Import, Token::FunctionName("")],
+                        "Failed to find another valid import or function to recover from",
+                    );
+                }
             } else {
                 self.recover([Token::Import, Token::FunctionName("")],
                         "Failed to find another valid import or function to recover from",
