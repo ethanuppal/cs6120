@@ -41,10 +41,10 @@ def init_worker(shared_event):
 def check_file(args):
     (executable, transformer, filename) = args
     given_code = subprocess.check_output(
-        f"{transformer} <{filename}", shell=True, stderr=subprocess.DEVNULL
+        f"bril2json <{filename}", shell=True, stderr=subprocess.DEVNULL
     ).decode("utf-8")
     passthrough_code = subprocess.check_output(
-        f"bril2json <{filename} | {executable} | bril2json",
+        f"{transformer} <{filename} | {executable} | bril2json",
         shell=True,
         stderr=subprocess.DEVNULL,
     ).decode("utf-8")
