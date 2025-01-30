@@ -38,7 +38,7 @@ jobs:
         run: |
           cd lesson2
           python3 test/check_equivalence.py bril-frontend ../target/debug/examples/print \
-          ../bril/benchmarks/**/*.bril \
+            ../bril/benchmarks/**/*.bril \
             --exclude ../bril/benchmarks/float/cordic.bril
 
   lesson2:
@@ -72,6 +72,6 @@ jobs:
       - name: Test build-cfg
         run: |
           cd lesson2
-          python3 test/check_equivalence.py build-cfg ../target/debug/build-cfg \
+          python3 test/check_equivalence.py build-cfg "../target/debug/build-cfg --mode passthrough" \
           ../bril/benchmarks/**/*.bril \
             --exclude ../bril/benchmarks/float/cordic.bril
