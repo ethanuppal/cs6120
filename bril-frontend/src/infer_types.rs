@@ -13,8 +13,8 @@ pub fn type_infer_function(
     context: &HashMap<String, (Vec<Type>, Option<Type>)>,
     function: &ast::Function,
 ) -> Result<(Vec<Type>, Option<Type>, BTreeMap<String, Type>), Diagnostic> {
-    let mut symbols = RefCell::new(HashMap::new());
-    let mut env = RefCell::new(BTreeMap::new());
+    let symbols = RefCell::new(HashMap::new());
+    let env = RefCell::new(BTreeMap::new());
     let mut parameter_types = vec![];
     let mut return_type = None;
 
@@ -298,7 +298,7 @@ pub fn type_infer_function(
                                 return Err(Diagnostic::new(format!("Tried to return nothing, but function has return type {}", return_type), effect_operation));
                             }
                         }
-                        ast::EffectOperationOp::Print(args) => {}
+                        ast::EffectOperationOp::Print(_) => {}
                         ast::EffectOperationOp::Nop => {}
                     }
                 }
