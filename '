@@ -170,7 +170,6 @@ type_snapshot! {
 
 @main() {
     three = const 3;
-    four = const 4;
     a = call @inc three;
     test = eq a four;
     print test;
@@ -182,8 +181,8 @@ type_error! {
     add_returns_int,
 r#"
 @main {
-    one = const 1;
-    bad: bool = add one one;
+    const one = 1;
+    const bad: bool = add one one;
 }
 "#
 }
