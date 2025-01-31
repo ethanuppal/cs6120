@@ -354,6 +354,34 @@ impl Backend {
             )
         };
 
+        let diagnostic_to_diagnostic =
+            |diagnostic: &bril_frontend::parser::Diagnostic| -> Diagnostic {
+                Diagnostic::new(
+                    span_to_range(diagnostic.span.clone()),
+                    Some(DiagnosticSeverity::ERROR),
+                    None,
+                    Some("Bril parser".into()),
+                    diagnostic.message.clone(),
+                    Some(
+                        diagnostic
+                            .labels
+                            .iter()
+                            .map(|(text, span)| DiagnosticRelatedInformation {
+                                location: Location::new(
+                                    uri.clone(),
+                                    span_to_range(
+                                        span.clone()
+                                            .unwrap_or(diagnostic.span.clone()),
+                                    ),
+                                ),
+                                message: text.clone(),
+                            })
+                            .collect(),
+                    ),
+                    None,
+                )
+            };
+
         let mut lexer = Token::lexer(&contents);
         let mut tokens = vec![];
         while let Some(next) = lexer.next() {
@@ -394,6 +422,27 @@ impl Backend {
 
         match parser.parse_program() {
             Ok(program) => {
+                let mut context = std::collections::HashMap::new();
+                for function in &program.functions {
+                    let (parameters, return_type, _) =
+                        match bril_frontend::infer_types::type_infer_function(
+                            &context, function,
+                        ) {
+                            Ok(result) => result,
+                            Err(diagnostic) => {
+                                diagnostics.push(diagnostic_to_diagnostic(
+                                    &diagnostic,
+                                ));
+                                return diagnostics;
+                            }
+                        };
+
+                    context.insert(
+                        function.name.to_string(),
+                        (parameters, return_type),
+                    );
+                }
+
                 let mut document_symbols = vec![];
                 let mut hover_complete_symbols = vec![];
 
@@ -523,33 +572,7 @@ impl Backend {
             }
             Err(()) => {
                 for diagnostic in parser.diagnostics() {
-                    diagnostics.push(Diagnostic::new(
-                        span_to_range(diagnostic.span.clone()),
-                        Some(DiagnosticSeverity::ERROR),
-                        None,
-                        Some("Bril parser".into()),
-                        diagnostic.message.clone(),
-                        Some(
-                            diagnostic
-                                .labels
-                                .iter()
-                                .map(|(text, span)| {
-                                    DiagnosticRelatedInformation {
-                                        location: Location::new(
-                                            uri.clone(),
-                                            span_to_range(
-                                                span.clone().unwrap_or(
-                                                    diagnostic.span.clone(),
-                                                ),
-                                            ),
-                                        ),
-                                        message: text.clone(),
-                                    }
-                                })
-                                .collect(),
-                        ),
-                        None,
-                    ));
+                    diagnostics.push(diagnostic_to_diagnostic(diagnostic));
                 }
             }
         }

@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+};
 
 use crate::{
     ast::{self, Type},
@@ -9,21 +12,27 @@ use crate::{
 pub fn type_infer_function(
     context: &HashMap<String, (Vec<Type>, Option<Type>)>,
     function: &ast::Function,
-) -> Result<HashMap<String, Type>, Diagnostic> {
-    let mut symbols = HashMap::new();
-    let mut env = HashMap::new();
+) -> Result<(Vec<Type>, Option<Type>, BTreeMap<String, Type>), Diagnostic> {
+    let mut symbols = RefCell::new(HashMap::new());
+    let mut env = RefCell::new(BTreeMap::new());
+    let mut parameter_types = vec![];
     let mut return_type = None;
 
     for (parameter, type_annotation) in &function.parameters {
-        if env.contains_key(&parameter.to_string()) {
+        if env.borrow().contains_key(&parameter.to_string()) {
+            let symbols = symbols.borrow();
             let previous = symbols
                 .get(&parameter.to_string())
                 .expect("Should be in symbols map");
             return Err(Diagnostic::new("Duplicate parameter name", parameter)
                 .label("Previous definition here", previous));
         }
-        symbols.insert(parameter.to_string(), parameter.clone());
-        env.insert(parameter.to_string(), type_annotation.ty.inner.clone());
+        symbols
+            .borrow_mut()
+            .insert(parameter.to_string(), parameter.clone());
+        env.borrow_mut()
+            .insert(parameter.to_string(), type_annotation.ty.inner.clone());
+        parameter_types.push(type_annotation.ty.inner.clone());
     }
 
     if let Some(return_type_annotation) = &function.return_type {
@@ -32,10 +41,11 @@ pub fn type_infer_function(
 
     let ensure =
         |op: &str, arg: &Loc<&str>, ty: Type| -> Result<(), Diagnostic> {
-            if let Some(arg_type) = env.get(&arg.to_string()) {
+            if let Some(arg_type) = env.borrow().get(&arg.to_string()) {
                 if arg_type.is_same_type_as(&ty) {
                     Ok(())
                 } else {
+                    let symbols = symbols.borrow();
                     let original = symbols
                         .get(&arg.to_string())
                         .expect("type exists so symbol does too");
@@ -81,11 +91,12 @@ pub fn type_infer_function(
                         }
                     }
 
-                    symbols.insert(
+                    symbols.borrow_mut().insert(
                         constant.name.to_string(),
                         constant.name.clone(),
                     );
-                    env.insert(constant.name.to_string(), inferred_type);
+                    env.borrow_mut()
+                        .insert(constant.name.to_string(), inferred_type);
                 }
                 ast::Instruction::ValueOperation(value_operation) => {
                     let inferred_type = match &*value_operation.op {
@@ -169,16 +180,18 @@ pub fn type_infer_function(
                                     parameter_type.clone(),
                                 )?;
                             }
-                            signature.1.ok_or(Diagnostic::new("Called function has no return type, but call used as value operation", name))?
+                            signature.1.clone().ok_or(Diagnostic::new("Called function has no return type, but call used as value operation", name))?
                         }
                         ast::ValueOperationOp::Id(value) => {
-                            let Some(ty) = env.get(&value.to_string()) else {
+                            let Some(ty) =
+                                env.borrow().get(&value.to_string()).cloned()
+                            else {
                                 return Err(Diagnostic::new(
                                     "Undefined variable in id instruction",
                                     value,
                                 ));
                             };
-                            ty.clone()
+                            ty
                         }
                         ast::ValueOperationOp::Fadd(lhs, rhs) => {
                             ensure("fadd", lhs, Type::Float)?;
@@ -230,15 +243,18 @@ pub fn type_infer_function(
                     if let Some(annotation) = &value_operation.type_annotation {
                         if !annotation.ty.inner.is_same_type_as(&inferred_type)
                         {
-                            return Err(Diagnostic::new(format!("Inferred type {inferred_type} did not match type annotation"), annotation).label("Type inferred here", &constant.value));
+                            return Err(Diagnostic::new(format!("Inferred type {inferred_type} did not match type annotation"), annotation).label("Type inferred here", &value_operation.op));
                         }
                     }
 
-                    symbols.insert(
+                    symbols.borrow_mut().insert(
                         value_operation.name.to_string(),
                         value_operation.name.clone(),
                     );
-                    env.insert(value_operation.name.to_string(), inferred_type);
+                    env.borrow_mut().insert(
+                        value_operation.name.to_string(),
+                        inferred_type,
+                    );
                 }
                 ast::Instruction::EffectOperation(effect_operation) => {
                     match &*effect_operation.op {
@@ -290,5 +306,5 @@ pub fn type_infer_function(
         }
     }
 
-    Ok(env)
+    Ok((parameter_types, return_type, env.take()))
 }
