@@ -6,16 +6,37 @@ use std::{
 use crate::{
     ast::{self, Type},
     loc::Loc,
-    parser::Diagnostic,
+    parser::{Diagnostic, Parser},
 };
+
+pub fn create_function_context(
+    functions: &[Loc<ast::Function>],
+) -> HashMap<String, (Vec<Type>, Option<Type>)> {
+    let mut context = HashMap::new();
+    for function in functions {
+        let mut parameter_types = vec![];
+        let mut return_type = None;
+
+        for (_, type_annotation) in &function.parameters {
+            parameter_types.push(type_annotation.ty.inner.clone());
+        }
+
+        if let Some(return_type_annotation) = &function.return_type {
+            return_type = Some(return_type_annotation.ty.inner.clone());
+        }
+
+        context
+            .insert(function.name.to_string(), (parameter_types, return_type));
+    }
+    context
+}
 
 pub fn type_infer_function(
     context: &HashMap<String, (Vec<Type>, Option<Type>)>,
     function: &ast::Function,
-) -> Result<(Vec<Type>, Option<Type>, BTreeMap<String, Type>), Diagnostic> {
+) -> Result<BTreeMap<String, Type>, Diagnostic> {
     let symbols = RefCell::new(HashMap::new());
     let env = RefCell::new(BTreeMap::new());
-    let mut parameter_types = vec![];
     let mut return_type = None;
 
     for (parameter, type_annotation) in &function.parameters {
@@ -32,12 +53,20 @@ pub fn type_infer_function(
             .insert(parameter.to_string(), parameter.clone());
         env.borrow_mut()
             .insert(parameter.to_string(), type_annotation.ty.inner.clone());
-        parameter_types.push(type_annotation.ty.inner.clone());
     }
 
     if let Some(return_type_annotation) = &function.return_type {
         return_type = Some(return_type_annotation.ty.inner.clone());
     }
+
+    let get_signature =
+        |name: &Loc<&str>| -> Result<(Vec<Type>, Option<Type>), Diagnostic> {
+            if let Some(signature) = context.get(&name.to_string()) {
+                Ok(signature.clone())
+            } else {
+                Err(Diagnostic::new("Called undefined function", name))
+            }
+        };
 
     let ensure =
         |op: &str, arg: &Loc<&str>, ty: Type| -> Result<(), Diagnostic> {
@@ -73,7 +102,7 @@ pub fn type_infer_function(
         if let ast::FunctionCode::Instruction(instruction) = &**code {
             match &**instruction {
                 ast::Instruction::Constant(constant) => {
-                    let inferred_type = match &*constant.value {
+                    let mut inferred_type = match &*constant.value {
                         ast::ConstantValue::IntegerLiteral(_) => ast::Type::Int,
                         ast::ConstantValue::BooleanLiteral(_) => {
                             ast::Type::Bool
@@ -87,7 +116,15 @@ pub fn type_infer_function(
                     if let Some(annotation) = &constant.type_annotation {
                         if !annotation.ty.inner.is_same_type_as(&inferred_type)
                         {
-                            return Err(Diagnostic::new(format!("Inferred type {inferred_type} did not match type annotation"), annotation).label("Type inferred here", &constant.value));
+                            if annotation.ty.is_same_type_as(&Type::Float)
+                                && inferred_type.is_same_type_as(&Type::Int)
+                            {
+                                // don't think this should be valid but some
+                                // programs rely on it
+                                inferred_type = Type::Float;
+                            } else {
+                                return Err(Diagnostic::new(format!("Inferred type {inferred_type} did not match type annotation"), annotation).label("Type inferred here", &constant.value));
+                            }
                         }
                     }
 
@@ -160,14 +197,7 @@ pub fn type_infer_function(
                             Type::Bool
                         }
                         ast::ValueOperationOp::Call(name, args) => {
-                            let Some(signature) =
-                                context.get(&name.to_string())
-                            else {
-                                return Err(Diagnostic::new(
-                                    "Called undefined function",
-                                    name,
-                                ));
-                            };
+                            let signature = get_signature(name)?;
                             if args.len() != signature.0.len() {
                                 return Err(Diagnostic::new(format!("Called function takes {} argument(s) but was passed {}", signature.0.len(), args.len()), name));
                             }
@@ -263,14 +293,7 @@ pub fn type_infer_function(
                             ensure("br", condition, Type::Bool)?;
                         }
                         ast::EffectOperationOp::Call(name, args) => {
-                            let Some(signature) =
-                                context.get(&name.to_string())
-                            else {
-                                return Err(Diagnostic::new(
-                                    "Called undefined function",
-                                    name,
-                                ));
-                            };
+                            let signature = get_signature(name)?;
                             if args.len() != signature.0.len() {
                                 return Err(Diagnostic::new(format!("Called function takes {} argument(s) but was passed {}", signature.0.len(), args.len()), name));
                             }
@@ -306,5 +329,5 @@ pub fn type_infer_function(
         }
     }
 
-    Ok((parameter_types, return_type, env.take()))
+    Ok(env.take())
 }
