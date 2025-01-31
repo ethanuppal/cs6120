@@ -196,13 +196,13 @@ impl<'writer, W: fmt::Write> Printer<'writer, W> {
                 write!(self.w, "flt {} {}", lhs, rhs)
             }
             ast::ValueOperationOp::Fle(lhs, rhs) => {
-                write!(self.w, "or {} {}", lhs, rhs)
+                write!(self.w, "fle {} {}", lhs, rhs)
             }
             ast::ValueOperationOp::Fgt(lhs, rhs) => {
-                write!(self.w, "or {} {}", lhs, rhs)
+                write!(self.w, "fgt {} {}", lhs, rhs)
             }
             ast::ValueOperationOp::Fge(lhs, rhs) => {
-                write!(self.w, "or {} {}", lhs, rhs)
+                write!(self.w, "fge {} {}", lhs, rhs)
             }
         }
     }
