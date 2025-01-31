@@ -6,7 +6,7 @@ use std::{
 use crate::{
     ast::{self, Type},
     loc::Loc,
-    parser::{Diagnostic, Parser},
+    parser::Diagnostic,
 };
 
 pub fn create_function_context(

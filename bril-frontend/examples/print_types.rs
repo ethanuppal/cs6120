@@ -12,7 +12,7 @@
 // You should have received a copy of the GNU General Public License along with
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, env, fmt::Write, fs, io};
+use std::{env, fmt::Write, fs, io};
 
 use annotate_snippets::{Level, Renderer, Snippet};
 use bril_frontend::{
@@ -20,7 +20,6 @@ use bril_frontend::{
     lexer::Token,
     loc::Loc,
     parser::{Diagnostic, Parser},
-    printer::Printer,
 };
 use logos::Logos;
 use snafu::{whatever, OptionExt, ResultExt, Whatever};

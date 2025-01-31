@@ -22,7 +22,7 @@ snafu = "0.8.5"
 argh = "0.1.13"
 serde_json = "1.0.137"
 owo-colors = "4.1.0"
-inform = { version = "0.3.3", features = ["io"] }
+inform = { version = "0.3.4", features = ["io"] }
 
 tokio = { version = "1.43.0", features = [
     "rt-multi-thread",
