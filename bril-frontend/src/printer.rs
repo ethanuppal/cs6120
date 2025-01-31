@@ -177,6 +177,33 @@ impl<'writer, W: fmt::Write> Printer<'writer, W> {
             ast::ValueOperationOp::Id(value) => {
                 write!(self.w, "id {}", value)
             }
+            ast::ValueOperationOp::Fadd(lhs, rhs) => {
+                write!(self.w, "fadd {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Fmul(lhs, rhs) => {
+                write!(self.w, "fmul {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Fsub(lhs, rhs) => {
+                write!(self.w, "fsub {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Fdiv(lhs, rhs) => {
+                write!(self.w, "fdiv {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Feq(lhs, rhs) => {
+                write!(self.w, "feq {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Flt(lhs, rhs) => {
+                write!(self.w, "flt {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Fle(lhs, rhs) => {
+                write!(self.w, "or {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Fgt(lhs, rhs) => {
+                write!(self.w, "or {} {}", lhs, rhs)
+            }
+            ast::ValueOperationOp::Fge(lhs, rhs) => {
+                write!(self.w, "or {} {}", lhs, rhs)
+            }
         }
     }
 

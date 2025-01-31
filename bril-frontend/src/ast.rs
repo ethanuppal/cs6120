@@ -124,6 +124,16 @@ pub enum ValueOperationOp<'a> {
     /// Value-operation version.
     Call(Loc<&'a str>, Vec<Loc<&'a str>>),
     Id(Loc<&'a str>),
+
+    Fadd(Loc<&'a str>, Loc<&'a str>),
+    Fmul(Loc<&'a str>, Loc<&'a str>),
+    Fsub(Loc<&'a str>, Loc<&'a str>),
+    Fdiv(Loc<&'a str>, Loc<&'a str>),
+    Feq(Loc<&'a str>, Loc<&'a str>),
+    Flt(Loc<&'a str>, Loc<&'a str>),
+    Fle(Loc<&'a str>, Loc<&'a str>),
+    Fgt(Loc<&'a str>, Loc<&'a str>),
+    Fge(Loc<&'a str>, Loc<&'a str>),
 }
 
 pub struct ValueOperation<'a> {

@@ -472,6 +472,16 @@ self.get(0)
         try_op!(self; op_name: "call" => ValueOperationOp::Call(destination as Token::FunctionName, arguments as Vec::from));
         try_op!(self; op_name: "id" => ValueOperationOp::Id(value as Token::Identifier));
 
+        try_op!(self; op_name: "fadd" => ValueOperationOp::Fadd(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "fmul" => ValueOperationOp::Fmul(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "fsub" => ValueOperationOp::Fsub(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "fdiv" => ValueOperationOp::Fdiv(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "feq" => ValueOperationOp::Feq(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "flt" => ValueOperationOp::Flt(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "fle" => ValueOperationOp::Fle(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "fgt" => ValueOperationOp::Fgt(lhs as Token::Identifier, rhs as Token::Identifier));
+        try_op!(self; op_name: "fge" => ValueOperationOp::Fge(lhs as Token::Identifier, rhs as Token::Identifier));
+
         self.diagnostics.push(
             Diagnostic::new("Unknown value operation", op_name)
                 .explain("Could not parse identifier as value operation"),
