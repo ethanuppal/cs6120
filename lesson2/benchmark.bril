@@ -1,0 +1,33 @@
+# Implementation based off of: https://stackoverflow.com/questions/11644441/fast-inverse-square-root-on-x64
+# double invsqrtQuake( double number )
+#   {
+#       double y = number;
+#       double x2 = y * 0.5;
+#       std::int64_t i = *(std::int64_t *) &y;
+#       // The magic number is for doubles is from https://cs.uwaterloo.ca/~m32rober/rsqrt.pdf
+#       i = 0x5fe6eb50c7b537a9 - (i >> 1);
+#       y = *(double *) &i;
+#       y = y * (1.5 - (x2 * y * y));   // 1st iteration
+#       //      y  = y * ( 1.5 - ( x2 * y * y ) );   // 2nd iteration, this can be removed
+#       return y;
+#   }
+
+@main(y: float) {
+  one_half: float = const 0.5;
+  one: int = const 1;
+  one_and_half: float = const 1.5;
+  magic: int = const 6910469410427058089;
+
+  x2: float = fmul y one_half;
+  i: int = float2bits y;
+  i2: int = call @RIGHTSHIFT i one;
+  i3: int = sub magic i2;
+  y2: float = bits2float i3;
+
+  y3: float = fmul y2 y2;
+  y4: float = fmul x2 y3;
+  y5: float = fsub one_and_half y4;
+  y6: float = fmul y2 y5;
+
+  print y6;
+}
