@@ -422,25 +422,21 @@ impl Backend {
 
         match parser.parse_program() {
             Ok(program) => {
-                let mut context = std::collections::HashMap::new();
-                for function in &program.functions {
-                    let (parameters, return_type, _) =
-                        match bril_frontend::infer_types::type_infer_function(
-                            &context, function,
-                        ) {
-                            Ok(result) => result,
-                            Err(diagnostic) => {
-                                diagnostics.push(diagnostic_to_diagnostic(
-                                    &diagnostic,
-                                ));
-                                return diagnostics;
-                            }
-                        };
-
-                    context.insert(
-                        function.name.to_string(),
-                        (parameters, return_type),
+                let context =
+                    bril_frontend::infer_types::create_function_context(
+                        &program.functions,
                     );
+                for function in &program.functions {
+                    if let Err(diagnostic) =
+                        bril_frontend::infer_types::type_infer_function(
+                            &context, function,
+                        )
+                    {
+                        diagnostics.push(diagnostic_to_diagnostic(&diagnostic));
+                    }
+                }
+                if !diagnostics.is_empty() {
+                    return diagnostics;
                 }
 
                 let mut document_symbols = vec![];
