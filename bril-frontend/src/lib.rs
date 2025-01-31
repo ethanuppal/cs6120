@@ -13,6 +13,7 @@
 // this program.  If not, see <https://www.gnu.org/licenses/>.
 
 pub mod ast;
+pub mod infer_types;
 pub mod lexer;
 pub mod loc;
 pub mod parser;

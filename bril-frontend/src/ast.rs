@@ -66,6 +66,21 @@ pub enum Type {
     Ptr(Box<Loc<Type>>),
 }
 
+impl Type {
+    pub fn is_same_type_as(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Type::Int, Type::Int)
+            | (Type::Bool, Type::Bool)
+            | (Type::Float, Type::Float)
+            | (Type::Char, Type::Char) => true,
+            (Type::Ptr(inner), Type::Ptr(inner2)) => {
+                inner.is_same_type_as(inner2)
+            }
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
