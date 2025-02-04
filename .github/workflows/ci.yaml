@@ -38,9 +38,10 @@ jobs:
       - name: Test correct parsing
         run: |
           make build_cfg \
+            ROOT="/home/runner/work/cs6120/cs6120" \
             BRIL="../bril" \
-            EQUIV_NAME = "bril-frontend --example print" \
-            EQUIV_CMD = "../target/debug/examples/print -" \
+            EQUIV_NAME="bril-frontend --example print" \
+            EQUIV_CMD="../target/debug/examples/print -"
 
       - name: Install Turnt
         # run: pip install turnt  # Use instead if pip turnt version >= 1.7
@@ -86,4 +87,6 @@ jobs:
         run: cd turnt ; flit install --symlink
 
       - name: Test build-cfg
-        run: make build_cfg BRIL="../bril"
+        run: make build_cfg \
+            ROOT="/home/runner/work/cs6120/cs6120" \
+            BRIL="../bril"
