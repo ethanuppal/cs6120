@@ -10,12 +10,11 @@ default:
 .PHONY: build_cfg
 build_cfg:	## Test build-cfg
 	make test_equivalence \
-		EQUIV_DIR="lesson2" \
 		EQUIV_NAME="build-cfg" \
 		EQUIV_CMD="${ROOT}/target/debug/build-cfg --mode passthrough" \
 		EQUIV_PIPE="bril2json"
 
-EQUIV_DIR := .
+EQUIV_DIR := lesson2
 EQUIV_NAME := _
 EQUIV_CMD := _
 EQUIV_PIPE := cat

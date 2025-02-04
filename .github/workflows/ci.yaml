@@ -37,7 +37,7 @@ jobs:
 
       - name: Test correct parsing
         run: |
-          make build_cfg \
+          make bril-frontend \
             ROOT="/home/runner/work/cs6120/cs6120" \
             BRIL="../bril" \
             EQUIV_NAME="bril-frontend --example print" \
