@@ -916,6 +916,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "tdce"
+version = "0.1.0"
+dependencies = [
+ "argh",
+ "bril-rs",
+ "build-cfg",
+ "serde_json",
+ "snafu",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"

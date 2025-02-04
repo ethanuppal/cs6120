@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["bril-frontend", "bril-lsp", "lesson2/build-cfg"]
+members = ["bril-frontend", "bril-lsp", "lesson2/build-cfg", "lesson3/tdce"]
 
 [workspace.package]
 version = "0.1.0"
