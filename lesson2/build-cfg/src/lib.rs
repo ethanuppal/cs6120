@@ -29,10 +29,13 @@ pub struct BasicBlock {
     pub is_entry: bool,
     pub label: Option<Label>,
     pub instructions: Vec<Instruction>,
-    pub exit: Option<LabeledExit>,
+    pub exit: LabeledExit,
 }
 
+#[derive(Default)]
 pub enum LabeledExit {
+    #[default]
+    Fallthrough,
     Unconditional {
         label: String,
         pos: Option<Position>,
@@ -48,6 +51,7 @@ pub enum LabeledExit {
 
 #[derive(Clone)]
 pub enum Exit {
+    Fallthrough(Option<BasicBlockIdx>),
     Unconditional(BasicBlockIdx),
     Conditional {
         condition: String,
@@ -75,6 +79,8 @@ struct FunctionCfgBuilder {
     cfg: FunctionCfg,
     current_block: BasicBlock,
     labels_to_blocks: HashMap<String, BasicBlockIdx>,
+    previous_idx: Option<BasicBlockIdx>,
+    successors: HashMap<BasicBlockIdx, BasicBlockIdx>,
 }
 
 impl FunctionCfgBuilder {
@@ -94,6 +100,8 @@ impl FunctionCfgBuilder {
             },
             current_block: BasicBlock::default(),
             labels_to_blocks: HashMap::default(),
+            previous_idx: None,
+            successors: HashMap::new(),
         }
     }
 
@@ -106,7 +114,8 @@ impl FunctionCfgBuilder {
     }
 
     pub fn set_current_exit(&mut self, exit: LabeledExit) {
-        self.current_block.exit = Some(exit);
+        assert!(!matches!(exit, LabeledExit::Fallthrough));
+        self.current_block.exit = exit;
     }
 
     pub fn mark_current_as_entry(&mut self) {
@@ -117,6 +126,12 @@ impl FunctionCfgBuilder {
         let current_label = self.current_block.label.clone();
         let current_block = mem::take(&mut self.current_block);
         let block_idx = self.cfg.vertices.insert(current_block);
+
+        if let Some(previous_idx) = self.previous_idx {
+            self.successors.insert(previous_idx, block_idx);
+        }
+        self.previous_idx = Some(block_idx);
+
         if let Some(label) = current_label {
             self.labels_to_blocks.insert(label.name.clone(), block_idx);
         }
@@ -124,58 +139,65 @@ impl FunctionCfgBuilder {
 
     pub fn finish(mut self) -> Result<FunctionCfg, Whatever> {
         for (block_idx, block) in &self.cfg.vertices {
-            if let Some(exit) = &block.exit {
-                match exit {
-                    LabeledExit::Unconditional { label: always, pos } => {
-                        let destination_index = *self
-                            .labels_to_blocks
-                            .get(always)
-                            .whatever_context(format!(
-                                "Unknown label {} referenced at {}",
-                                always,
-                                pos_to_string(pos.as_ref())
-                            ))?;
-                        self.cfg.edges.insert(
-                            block_idx,
-                            Exit::Unconditional(destination_index),
-                        );
-                    }
-                    LabeledExit::Conditional {
-                        condition,
-                        if_true_label,
-                        if_false_label,
-                        pos,
-                    } => {
-                        let if_true_index = *self
-                            .labels_to_blocks
-                            .get(if_true_label)
-                            .whatever_context(format!(
-                                "Unknown label {} referenced at {}",
-                                if_true_label,
-                                pos_to_string(pos.as_ref())
-                            ))?;
-                        let if_false_index = *self
-                            .labels_to_blocks
-                            .get(if_false_label)
-                            .whatever_context(format!(
-                                "Unknown label {} referenced at {}",
-                                if_false_label,
-                                pos_to_string(pos.as_ref())
-                            ))?;
-                        self.cfg.edges.insert(
-                            block_idx,
-                            Exit::Conditional {
-                                condition: condition.clone(),
-                                if_true: if_true_index,
-                                if_false: if_false_index,
-                            },
-                        );
-                    }
-                    LabeledExit::Return(value) => {
-                        self.cfg
-                            .edges
-                            .insert(block_idx, Exit::Return(value.clone()));
-                    }
+            match &block.exit {
+                LabeledExit::Fallthrough => {
+                    let exit = self
+                        .successors
+                        .get(&block_idx)
+                        .copied()
+                        .map(|after_idx| Exit::Fallthrough(Some(after_idx)))
+                        .unwrap_or(Exit::Fallthrough(None));
+                    self.cfg.edges.insert(block_idx, exit);
+                }
+                LabeledExit::Unconditional { label: always, pos } => {
+                    let destination_index = *self
+                        .labels_to_blocks
+                        .get(always)
+                        .whatever_context(format!(
+                            "Unknown label {} referenced at {}",
+                            always,
+                            pos_to_string(pos.as_ref())
+                        ))?;
+                    self.cfg.edges.insert(
+                        block_idx,
+                        Exit::Unconditional(destination_index),
+                    );
+                }
+                LabeledExit::Conditional {
+                    condition,
+                    if_true_label,
+                    if_false_label,
+                    pos,
+                } => {
+                    let if_true_index = *self
+                        .labels_to_blocks
+                        .get(if_true_label)
+                        .whatever_context(format!(
+                            "Unknown label {} referenced at {}",
+                            if_true_label,
+                            pos_to_string(pos.as_ref())
+                        ))?;
+                    let if_false_index = *self
+                        .labels_to_blocks
+                        .get(if_false_label)
+                        .whatever_context(format!(
+                            "Unknown label {} referenced at {}",
+                            if_false_label,
+                            pos_to_string(pos.as_ref())
+                        ))?;
+                    self.cfg.edges.insert(
+                        block_idx,
+                        Exit::Conditional {
+                            condition: condition.clone(),
+                            if_true: if_true_index,
+                            if_false: if_false_index,
+                        },
+                    );
+                }
+                LabeledExit::Return(value) => {
+                    self.cfg
+                        .edges
+                        .insert(block_idx, Exit::Return(value.clone()));
                 }
             }
         }

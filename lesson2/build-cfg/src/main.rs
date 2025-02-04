@@ -80,6 +80,7 @@ fn print_reconstructed(program: Program) -> Result<(), Whatever> {
             }
             if let Some(exit) = cfg.edges.get(block_index) {
                 match exit {
+                    Exit::Fallthrough(_) => {}
                     Exit::Unconditional(destination) => {
                         let destination_label = cfg.vertices[*destination]
                             .label
@@ -193,6 +194,32 @@ fn print_pretty(program: Program) -> Result<(), Whatever> {
 
             if let Some(exit) = cfg.edges.get(block_idx).cloned() {
                 match exit {
+                    Exit::Fallthrough(destination) => {
+                        if let Some(destination) = destination {
+                            write!(
+                                f,
+                                "-> {}",
+                                destination
+                                    .as_number()
+                                    .to_string()
+                                    .bold()
+                                    .bright_green()
+                            )
+                            .whatever_context("Writing to stdout failed")?;
+                            if let Some(label) =
+                                &cfg.vertices[destination].label
+                            {
+                                write!(
+                                    f,
+                                    " (.{})",
+                                    label.name.on_truecolor(64, 64, 64)
+                                )
+                                .whatever_context("Writing to stdout failed")?;
+                            }
+                            writeln!(f)
+                                .whatever_context("Writing to stdout failed")?;
+                        }
+                    }
                     Exit::Unconditional(destination) => {
                         write!(
                             f,

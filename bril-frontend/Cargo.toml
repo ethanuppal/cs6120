@@ -1,11 +1,7 @@
 [package]
 name = "bril-frontend"
 description = "AST and type-checking for Bril programs"
-<<<<<<< HEAD
-version = "0.1.1"
-=======
 version = "0.1.2"
->>>>>>> 4a7a4e5 (chore: Bump frontend/lsp versions)
 edition.workspace = true
 license = "GPL-3.0"
 

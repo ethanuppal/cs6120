@@ -29,7 +29,11 @@ def parse_args():
         package,
         executable,
         transformer,
-        [filename for filename in filenames if filename not in exclude],
+        [
+            filename
+            for filename in filenames
+            if not any(isinstance(e, str) and filename.endswith(e) for e in exclude)
+        ],
     )
 
 
@@ -54,7 +58,9 @@ def check_file(args):
     if given_bril == passthrough_bril:
         print(f"{filename} OK")
     else:
-        print(f"\x1b[31;1m{filename} ERROR\x1b[m")
+        print(
+            f"\x1b[31;1m{filename} ERROR\x1b[m\n\n--GIVEN--\n{json.dumps(given_bril)}\n\n--GOT--\n{json.dumps(passthrough_bril)}"
+        )
         event.set()
 
 
