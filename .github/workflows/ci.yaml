@@ -37,10 +37,11 @@ jobs:
 
       - name: Test correct parsing
         run: |
-          cd lesson2
-          python3 test/check_equivalence.py "bril-frontend --example print" "../target/debug/examples/print -" "cat" \
-            ../bril/benchmarks/**/*.bril \
-            --exclude ../bril/benchmarks/float/cordic.bril
+          make build_cfg \
+            ROOT="/home/runner/work/cs6120/cs6120" \
+            BRIL="../bril" \
+            EQUIV_NAME="bril-frontend --example print" \
+            EQUIV_CMD="../target/debug/examples/print -"
 
       - name: Install Turnt
         # run: pip install turnt  # Use instead if pip turnt version >= 1.7
@@ -86,8 +87,6 @@ jobs:
         run: cd turnt ; flit install --symlink
 
       - name: Test build-cfg
-        run: |
-          cd lesson2
-          python3 test/check_equivalence.py build-cfg "../target/debug/build-cfg --mode passthrough" bril2json \
-          ../bril/benchmarks/**/*.bril \
-            --exclude ../bril/benchmarks/float/cordic.bril
+        run: make build_cfg \
+            ROOT="/home/runner/work/cs6120/cs6120" \
+            BRIL="../bril"
