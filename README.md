@@ -19,7 +19,7 @@ i.e., you can fork this project (although I strongly recommend not doing so).
 
 The exceptions to this license are as follows:
 
-- [bril-lsp](./bril-lsp/) is licensed under the GNU General Public License, 
+- [bril-lsp](https://github.com/ethanuppal/bril-lsp/tree/main/bril-lsp) is licensed under the GNU General Public License, 
   Version 3.0.
-- [bril-frontend](./bril-frontend/) is licensed under the GNU General Public
+- [bril-frontend](https://github.com/ethanuppal/bril-lsp/tree/main/bril-frontend) is licensed under the GNU General Public
   License, Version 3.0.
