@@ -1,1 +1,0 @@
-command = "cargo run --quiet --package bril-frontend --example print_types -- {filename}"

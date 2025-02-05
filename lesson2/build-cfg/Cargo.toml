@@ -2,7 +2,7 @@
 name = "build-cfg"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+license-file.workspace = true
 
 [dependencies]
 bril-rs.workspace = true
