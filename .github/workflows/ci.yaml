@@ -80,4 +80,14 @@ jobs:
           cargo build --package tdce
           bril2json <../bril/examples/test/tdce/combo.bril | brili -p
           bril2json <../bril/examples/test/tdce/combo.bril | ../target/debug/tdce | bril2json | brili -p
-          brench brench.toml ../bril/benchmarks/**/*.bril | grep connected-components --invert-match | python3 check_brench.py
+
+          cat ../bril/examples/test/tdce/combo.bril | tail -n +2 > ../bril/examples/test/tdce/combo.bril.temp
+          cat ../bril/examples/test/tdce/combo.bril.temp > ../bril/examples/test/tdce/combo.bril
+
+          cat ../bril/examples/test/tdce/double-pass.bril | tail -n +2 > ../bril/examples/test/tdce/double-pass.bril.temp
+          cat ../bril/examples/test/tdce/double-pass.bril.temp > ../bril/examples/test/tdce/double-pass.bril
+
+          cat ../bril/examples/test/tdce/reassign-dkp.bril | tail -n +2 > ../bril/examples/test/tdce/reassign-dkp.bril.temp
+          cat ../bril/examples/test/tdce/reassign-dkp.bril.temp > ../bril/examples/test/tdce/reassign-dkp.bril
+
+          brench brench.toml ../bril/benchmarks/**/*.bril ../bril/examples/test/tdce/*.bril | grep connected-components --invert-match | python3 check_brench.py
