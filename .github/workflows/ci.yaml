@@ -76,4 +76,4 @@ jobs:
           uv tool install brench
       
       - name: Test trivial DCE
-        run: cd lesson3 && cargo build --package tdce && brench brench.toml
+        run: cd lesson3 && cargo build --package tdce && brench brench.toml | python3 check_brench.py
