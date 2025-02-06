@@ -67,13 +67,12 @@ jobs:
             cache: pip
             cache-dependency-path: bril/bril-txt/pyproject.toml
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-      - name: Install Python tools
-        run: |
-          cd bril
-          uv tool install bril-txt
-          uv tool install brench
+      - name: Install Flit
+        run: pip install flit
+      - name: bril-txt
+        run: cd bril/bril-txt ; flit install --symlink
+      - name: brench
+        run: cd bril/brench ; flit install --symlink
       
       - name: Test trivial DCE
         run: cd lesson3 && cargo build --package tdce && brench brench.toml | python3 check_brench.py
