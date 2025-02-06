@@ -73,6 +73,10 @@ jobs:
         run: cd bril/bril-txt ; flit install --symlink
       - name: brench
         run: cd bril/brench ; flit install --symlink
-      
+
       - name: Test trivial DCE
-        run: cd lesson3 && cargo build --package tdce && brench brench.toml | python3 check_brench.py
+        run: |
+          cd lesson3
+          cargo build --package tdce
+          bril2json <../bril/examples/test/tdce/simple.bril | ../target/debug/tdce | bril2json | brili -p
+          brench brench.toml | python3 check_brench.py
