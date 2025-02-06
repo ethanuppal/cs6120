@@ -6,9 +6,4 @@ benchmarks = '../bril/benchmarks/core/*.bril'
 pipeline = ["bril2json", "brili -p {args}"]
 
 [runs.tdce]
-pipeline = [
-    "bril2json",
-    "/Users/ethan/gh/cs6120/target/debug/tdce",
-    "bril2json",
-    "brili -p {args}",
-]
+pipeline = ["bril2json", "../target/debug/tdce", "bril2json", "brili -p {args}"]
