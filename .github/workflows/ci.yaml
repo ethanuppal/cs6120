@@ -59,7 +59,7 @@ jobs:
           deno-version: v1.x
      
       - name: Install brili
-        run: deno install brili.ts 
+        run: deno install --global brili.ts 
 
       - uses: actions/setup-python@v4
         with:
