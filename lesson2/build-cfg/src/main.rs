@@ -10,8 +10,8 @@ use std::{
 };
 
 use argh::FromArgs;
-use bril_rs::{EffectOps, Instruction, Program};
-use build_cfg::{build_cfg, Exit};
+use bril_rs::Program;
+use build_cfg::{build_cfg, print::print_cfg_as_bril_text, Exit};
 use inform::{common::IndentWriterCommon, io::IndentWriter};
 use owo_colors::OwoColorize;
 use snafu::{ResultExt, Whatever};
@@ -55,91 +55,7 @@ fn print_reconstructed(program: Program) -> Result<(), Whatever> {
             "Failed to build control-flow graph for function `{}`",
             function.name
         ))?;
-
-        println!(
-            "@{}({}){} {{",
-            cfg.signature.name,
-            cfg.signature
-                .arguments
-                .iter()
-                .map(|argument| argument.to_string())
-                .collect::<Vec<_>>()
-                .join(", "),
-            if let Some(return_type) = cfg.signature.return_type {
-                format!(": {}", return_type)
-            } else {
-                "".into()
-            }
-        );
-        for (block_index, block) in &cfg.vertices {
-            if let Some(label) = &block.label {
-                println!(".{}:", label.name);
-            }
-            for instruction in &block.instructions {
-                println!("  {}", instruction);
-            }
-            if let Some(exit) = cfg.edges.get(block_index) {
-                match exit {
-                    Exit::Fallthrough(_) => {}
-                    Exit::Unconditional(destination) => {
-                        let destination_label = cfg.vertices[*destination]
-                            .label
-                            .as_ref()
-                            .expect("jumped without label");
-                        println!(
-                            "  {}",
-                            Instruction::Effect {
-                                args: vec![],
-                                funcs: vec![],
-                                labels: vec![destination_label.name.clone()],
-                                op: EffectOps::Jump,
-                                pos: None
-                            }
-                        )
-                    }
-                    Exit::Conditional {
-                        condition,
-                        if_true,
-                        if_false,
-                    } => {
-                        let if_true_label = cfg.vertices[*if_true]
-                            .label
-                            .as_ref()
-                            .expect("branched without label");
-                        let if_false_label = cfg.vertices[*if_false]
-                            .label
-                            .as_ref()
-                            .expect("branched without label");
-                        println!(
-                            "  {}",
-                            Instruction::Effect {
-                                args: vec![condition.clone()],
-                                funcs: vec![],
-                                labels: vec![
-                                    if_true_label.name.clone(),
-                                    if_false_label.name.clone()
-                                ],
-                                op: EffectOps::Branch,
-                                pos: None
-                            }
-                        )
-                    }
-                    Exit::Return(value) => {
-                        println!(
-                            "  {}",
-                            Instruction::Effect {
-                                args: value.iter().cloned().collect(),
-                                funcs: vec![],
-                                labels: vec![],
-                                op: EffectOps::Return,
-                                pos: None
-                            }
-                        )
-                    }
-                }
-            }
-        }
-        println!("}}");
+        print_cfg_as_bril_text(cfg);
     }
 
     Ok(())

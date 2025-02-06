@@ -1,0 +1,14 @@
+extract = 'total_dyn_inst: (\d+)'
+# benchmarks = '../../bril/examples/test/tdce/*.bril'
+benchmarks = '../../bril/benchmarks/core/*.bril'
+
+[runs.baseline]
+pipeline = ["bril2json", "brili -p {args}"]
+
+[runs.tdce]
+pipeline = [
+    "bril2json",
+    "/Users/ethan/gh/cs6120/target/debug/tdce",
+    "bril2json",
+    "brili -p {args}",
+]
