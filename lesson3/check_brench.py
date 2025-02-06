@@ -9,8 +9,10 @@ for i in range(1, len(rows), 2):
     if tdce[2] == "incorrect":
         print(f"\x1b[31m{baseline[0]} INCORRECT\x1b[m")
         sys.exit(1)
+    elif tdce[2] == "timeout":
+        print(f"\x1b[31m{baseline[0]} TIMED OUT\x1b[m")
+        sys.exit(1)
 
-    print(baseline[0])
     baseline_time = int(baseline[2])
     tdce_time = int(tdce[2])
 
