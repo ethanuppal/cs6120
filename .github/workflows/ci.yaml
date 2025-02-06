@@ -44,7 +44,7 @@ jobs:
       - name: Test build-cfg
         run: make build_cfg \
             ROOT="/home/runner/work/cs6120/cs6120" \
-            BRIL="../bril"
+            BRIL="bril"
   lesson3:
     runs-on: ubuntu-latest
     steps:
@@ -59,7 +59,7 @@ jobs:
           deno-version: v1.x
      
       - name: Install brili
-        run: cd ../bril && deno install --global brili.ts 
+        run: cd bril && deno install --global brili.ts 
 
       - uses: actions/setup-python@v4
         with:
@@ -71,7 +71,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
       - name: Install Python tools
         run: |
-          cd ../bril
+          cd bril
           uv tool install bril-txt
           uv tool install brench
       
