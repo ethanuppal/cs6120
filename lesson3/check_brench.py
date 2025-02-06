@@ -12,6 +12,9 @@ for i in range(1, len(rows), 2):
     elif tdce[2] == "timeout":
         print(f"\x1b[31m{baseline[0]} TIMED OUT\x1b[m")
         sys.exit(1)
+    elif tdce[2] == "missing":
+        print(f"\x1b[31m{baseline[0]} MISSING\x1b[m")
+        sys.exit(1)
 
     baseline_time = int(baseline[2])
     tdce_time = int(tdce[2])
