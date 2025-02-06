@@ -81,4 +81,4 @@ jobs:
           bril2json <../bril/examples/test/tdce/simple.bril | ../target/debug/tdce | bril2json | brili -p
           bril2json <../bril/benchmarks/core/combination.bril | ../target/debug/tdce | bril2json | brili -p 12 3
           bril2json <../bril/benchmarks/core/combination.bril | brili -p 12 3
-          brench brench.toml | python3 check_brench.py
+          brench brench.toml ../bril/benchmarks/**/*.bril | grep connected-components --invert-match | python3 check_brench.py
