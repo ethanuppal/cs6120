@@ -79,4 +79,5 @@ jobs:
           cd lesson3
           cargo build --package tdce
           bril2json <../bril/examples/test/tdce/simple.bril | ../target/debug/tdce | bril2json | brili -p
+          bril2json <../bril/benchmarks/core/combination.bril | ../target/debug/tdce | bril2json | brili -p 12 3
           brench brench.toml | python3 check_brench.py
