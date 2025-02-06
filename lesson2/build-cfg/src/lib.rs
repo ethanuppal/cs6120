@@ -10,6 +10,10 @@ use bril_rs::{
 use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
 use snafu::{whatever, OptionExt, Whatever};
 
+pub mod print;
+
+pub use slotmap;
+
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Label {
     pub name: String,
@@ -233,6 +237,8 @@ pub fn build_cfg(function: &Function) -> Result<FunctionCfg, Whatever> {
                     pos,
                     ..
                 } => {
+                    builder.add_to_current(instruction.clone());
+
                     let [destination_label] = labels.as_slice() else {
                         whatever!(
                             "Jump operation at {} should take one label",
@@ -254,6 +260,8 @@ pub fn build_cfg(function: &Function) -> Result<FunctionCfg, Whatever> {
                     pos,
                     ..
                 } => {
+                    builder.add_to_current(instruction.clone());
+
                     let [condition] = args.as_slice() else {
                         whatever!(
                             "Branch operation at {} should take one condition argument",
@@ -284,6 +292,8 @@ pub fn build_cfg(function: &Function) -> Result<FunctionCfg, Whatever> {
                     pos,
                     ..
                 } => {
+                    builder.add_to_current(instruction.clone());
+
                     let value = match args.as_slice() {
                         [] => None,
                         [value] => Some(value.clone()),
