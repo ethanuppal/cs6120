@@ -8,3 +8,6 @@ pipeline = ["bril2json", "brili -p {args}"]
 
 [runs.tdce]
 pipeline = ["bril2json", "../target/debug/tdce", "bril2json", "brili -p {args}"]
+
+[runs.lvn]
+pipeline = ["bril2json", "../target/debug/lvn", "bril2json", "brili -p {args}"]

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, io, path::PathBuf};
+use std::{collections::HashMap, fs, hash::Hash, io, path::PathBuf};
 
 use argh::FromArgs;
 use bril_rs::{Instruction, Program, ValueOps};
@@ -14,9 +14,31 @@ struct Opts {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
+enum OpArg {
+    Value(usize),
+    Unknown(String),
+}
+
+#[derive(Clone)]
+struct NeverEqual;
+
+impl PartialEq for NeverEqual {
+    fn eq(&self, _other: &Self) -> bool {
+        false
+    }
+}
+
+impl Eq for NeverEqual {}
+
+impl Hash for NeverEqual {
+    fn hash<H: std::hash::Hasher>(&self, _state: &mut H) {}
+}
+
+#[derive(PartialEq, Eq, Hash, Clone)]
 enum Value {
     Const(String),
-    Op(ValueOps, Vec<usize>),
+    Op(ValueOps, Vec<OpArg>),
+    Call(NeverEqual),
 }
 
 #[derive(Default)]
@@ -24,6 +46,7 @@ struct ValueTable {
     /// `(value, canonical_variable)` pairs
     values: Vec<(Value, String)>,
     intern: HashMap<Value, usize>,
+    counter: usize,
     variables_to_values: HashMap<String, usize>,
 }
 
@@ -32,62 +55,93 @@ impl ValueTable {
         &mut self,
         value: Value,
         current_variable: &str,
-    ) -> Option<String> {
+        is_overwritten: bool,
+    ) -> (String, Option<String>) {
         if let Some(existing_value_index) = self.intern.get(&value).copied() {
             self.variables_to_values
                 .insert(current_variable.to_owned(), existing_value_index);
-
-            None
+            (
+                current_variable.to_owned(),
+                Some(self.values[existing_value_index].1.clone()),
+            )
         } else {
-            self.values
-                .push((value.clone(), current_variable.to_owned()));
+            let new_name = if is_overwritten {
+                self.counter += 1;
+                format!("{}__t{}", current_variable, self.counter)
+            } else {
+                current_variable.to_owned()
+            };
+
+            self.values.push((value.clone(), new_name.clone()));
             let new_value_index = self.values.len() - 1;
             self.intern.insert(value, new_value_index);
 
             self.variables_to_values
                 .insert(current_variable.to_owned(), new_value_index);
-
-            Some(self.values[new_value_index].1.clone())
+            (new_name, None)
         }
     }
 
-    fn get_value(&self, variable: &str) -> usize {
-        self.variables_to_values
-            .get(variable)
-            .copied()
-            .unwrap_or_else(|| panic!("could not get value for {variable}"))
+    fn get_value(&self, variable: &str) -> Option<usize> {
+        self.variables_to_values.get(variable).copied()
     }
 
-    fn get_canonical_name(&self, value: usize) -> String {
-        self.values[value].1.clone()
+    fn get_canonical_name(&self, value: OpArg) -> String {
+        match value {
+            OpArg::Value(value) => self.values[value].1.clone(),
+            OpArg::Unknown(other) => other,
+        }
     }
 }
 
 pub fn lvn(block: &mut BasicBlock) {
     let mut table = ValueTable::default();
 
-    for instruction in &mut block.instructions {
+    let mut last_assignment = HashMap::new();
+
+    for (i, instruction) in block.instructions.iter().enumerate() {
+        if let Instruction::Constant { dest, .. }
+        | Instruction::Value { dest, .. } = &instruction
+        {
+            last_assignment.insert(dest.clone(), i);
+        }
+    }
+
+    for (i, instruction) in block.instructions.iter_mut().enumerate() {
         *instruction = match &instruction {
             Instruction::Constant {
-                dest, pos, value, ..
+                dest,
+                pos,
+                value,
+                const_type,
+                op,
             } => {
-                if let Some(replacement_variable) = table
-                    .add_value_and_get_existing_variable(
-                        Value::Const(value.to_string()),
-                        dest,
-                    )
-                {
-                    Instruction::Value {
-                        dest: dest.clone(),
-                        op: ValueOps::Id,
-                        pos: pos.clone(),
-                        args: vec![replacement_variable.clone()],
-                        funcs: vec![],
-                        labels: vec![],
-                        op_type: None,
+                let is_overwritten =
+                    last_assignment.get(dest).copied().unwrap() > i;
+                match table.add_value_and_get_existing_variable(
+                    Value::Const(value.to_string()),
+                    dest,
+                    is_overwritten,
+                ) {
+                    (destination, Some(replacement_variable)) => {
+                        Instruction::Value {
+                            dest: destination,
+                            op: ValueOps::Id,
+                            pos: pos.clone(),
+                            args: vec![replacement_variable.clone()],
+                            funcs: vec![],
+                            labels: vec![],
+                            op_type: const_type.clone(),
+                        }
                     }
-                } else {
-                    instruction.clone()
+
+                    (destination, None) => Instruction::Constant {
+                        dest: destination,
+                        op: *op,
+                        pos: pos.clone(),
+                        const_type: const_type.clone(),
+                        value: value.clone(),
+                    },
                 }
             }
             Instruction::Value {
@@ -98,7 +152,40 @@ pub fn lvn(block: &mut BasicBlock) {
                 op: ValueOps::Call,
                 pos,
                 op_type,
-            } => todo!(),
+            } => {
+                let is_overwritten =
+                    last_assignment.get(dest).copied().unwrap() > i;
+                let new_args = args
+                    .iter()
+                    .map(|arg| {
+                        table
+                            .get_value(arg)
+                            .map(OpArg::Value)
+                            .unwrap_or(OpArg::Unknown(arg.clone()))
+                    })
+                    .collect::<Vec<_>>();
+                match table.add_value_and_get_existing_variable(
+                    Value::Call(NeverEqual),
+                    dest,
+                    is_overwritten,
+                ) {
+                    (destination, None) => Instruction::Value {
+                        args: new_args
+                            .into_iter()
+                            .map(|value| table.get_canonical_name(value))
+                            .collect(),
+                        dest: destination,
+                        funcs: funcs.clone(),
+                        labels: labels.clone(),
+                        op: ValueOps::Call,
+                        pos: pos.clone(),
+                        op_type: op_type.clone(),
+                    },
+                    (destination, Some(replacement_variable)) => {
+                        unreachable!("call values should never be recovered")
+                    }
+                }
+            }
             Instruction::Value {
                 args,
                 dest,
@@ -108,38 +195,45 @@ pub fn lvn(block: &mut BasicBlock) {
                 pos,
                 op_type,
             } => {
+                let is_overwritten =
+                    last_assignment.get(dest).copied().unwrap() > i;
                 let new_args = args
                     .iter()
-                    .map(|arg| table.get_value(arg))
+                    .map(|arg| {
+                        table
+                            .get_value(arg)
+                            .map(OpArg::Value)
+                            .unwrap_or(OpArg::Unknown(arg.clone()))
+                    })
                     .collect::<Vec<_>>();
-                if let Some(replacement_variable) = table
-                    .add_value_and_get_existing_variable(
-                        Value::Op(*op, new_args.clone()),
-                        dest,
-                    )
-                {
-                    Instruction::Value {
-                        dest: dest.clone(),
-                        op: ValueOps::Id,
-                        pos: pos.clone(),
-                        args: vec![replacement_variable.clone()],
-                        funcs: vec![],
-                        labels: vec![],
-                        op_type: None,
+                match table.add_value_and_get_existing_variable(
+                    Value::Op(*op, new_args.clone()),
+                    dest,
+                    is_overwritten,
+                ) {
+                    (destination, Some(replacement_variable)) => {
+                        Instruction::Value {
+                            dest: destination,
+                            op: ValueOps::Id,
+                            pos: pos.clone(),
+                            args: vec![replacement_variable.clone()],
+                            funcs: vec![],
+                            labels: vec![],
+                            op_type: op_type.clone(),
+                        }
                     }
-                } else {
-                    Instruction::Value {
+                    (destination, None) => Instruction::Value {
                         args: new_args
                             .into_iter()
                             .map(|value| table.get_canonical_name(value))
                             .collect(),
-                        dest: dest.clone(),
+                        dest: destination,
                         funcs: funcs.clone(),
                         labels: labels.clone(),
                         op: *op,
                         pos: pos.clone(),
                         op_type: op_type.clone(),
-                    }
+                    },
                 }
             }
             Instruction::Effect {
@@ -151,7 +245,12 @@ pub fn lvn(block: &mut BasicBlock) {
             } => {
                 let new_args = args
                     .iter()
-                    .map(|arg| table.get_value(&arg))
+                    .map(|arg| {
+                        table
+                            .get_value(arg)
+                            .map(OpArg::Value)
+                            .unwrap_or(OpArg::Unknown(arg.clone()))
+                    })
                     .map(|value| table.get_canonical_name(value))
                     .collect();
                 Instruction::Effect {

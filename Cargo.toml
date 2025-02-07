@@ -8,7 +8,7 @@ edition = "2021"
 license-file = "LICENSE"
 
 [workspace.dependencies]
-bril-rs = { git = "https://github.com/ethanuppal/bril", rev = "033745beff16cc579c630ebb00510fc0fa7a9ea2", features = [
+bril-rs = { git = "https://github.com/sampsyo/bril", features = [
     "memory",
     "float",
     "ssa",
