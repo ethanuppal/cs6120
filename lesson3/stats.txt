@@ -1,0 +1,5 @@
+Run:
+
+    brench brench.toml ../bril/benchmarks/**/*.bril ../bril/examples/test/tdce/*.bril | python3 make_better_chart.py > stats.csv
+
+to make stats.csv
