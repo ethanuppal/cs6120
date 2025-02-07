@@ -13,7 +13,7 @@ struct Opts {
     input: Option<PathBuf>,
 }
 
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 enum OpArg {
     Value(usize),
     Unknown(String),
@@ -244,7 +244,7 @@ pub fn lvn(block: &mut BasicBlock) {
             } => {
                 let is_overwritten =
                     last_assignment.get(dest).copied().unwrap() > i;
-                let new_args = args
+                let mut new_args = args
                     .iter()
                     .map(|arg| {
                         table
@@ -253,6 +253,21 @@ pub fn lvn(block: &mut BasicBlock) {
                             .unwrap_or(OpArg::Unknown(arg.clone()))
                     })
                     .collect::<Vec<_>>();
+                if matches!(
+                    op,
+                    ValueOps::Add
+                        | ValueOps::Fadd
+                        | ValueOps::Mul
+                        | ValueOps::Fmul
+                        | ValueOps::Eq
+                        | ValueOps::Feq
+                        | ValueOps::And
+                        | ValueOps::Or
+                        | ValueOps::Ceq
+                        | ValueOps::Phi
+                ) {
+                    new_args.sort();
+                }
                 match table.add_value_and_get_existing_variable(
                     Value::Op(*op, new_args.clone()),
                     dest,

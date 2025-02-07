@@ -1,0 +1,21 @@
+extract = 'total_dyn_inst: (\d+)'
+timeout = 200
+
+[runs.baseline]
+pipeline = ["bril2json", "brili -p"]
+
+[runs.tdce]
+pipeline = ["bril2json", "../target/debug/tdce", "bril2json", "brili -p"]
+
+[runs.lvn]
+pipeline = ["bril2json", "../target/debug/lvn", "bril2json", "brili -p"]
+
+[runs.lvn_then_tdce]
+pipeline = [
+    "bril2json",
+    "../target/debug/lvn",
+    "bril2json",
+    "../target/debug/tdce",
+    "bril2json",
+    "brili -p",
+]
