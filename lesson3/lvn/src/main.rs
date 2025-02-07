@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs, hash::Hash, io, path::PathBuf};
 
 use argh::FromArgs;
-use bril_rs::{Instruction, Literal, Program, Type, ValueOps};
+use bril_rs::{Instruction, Program, Type, ValueOps};
 use build_cfg::{print::print_cfg_as_bril_text, BasicBlock};
 use snafu::{ResultExt, Whatever};
 
@@ -186,7 +186,7 @@ pub fn lvn(block: &mut BasicBlock) {
                         pos: pos.clone(),
                         op_type: op_type.clone(),
                     },
-                    (destination, Some(replacement_variable)) => {
+                    (_destination, Some(_replacement_variable)) => {
                         unreachable!("alloc values should never be recovered")
                     }
                 }
@@ -228,7 +228,7 @@ pub fn lvn(block: &mut BasicBlock) {
                         pos: pos.clone(),
                         op_type: op_type.clone(),
                     },
-                    (destination, Some(replacement_variable)) => {
+                    (_destination, Some(_replacement_variable)) => {
                         unreachable!("call values should never be recovered")
                     }
                 }

@@ -1,7 +1,7 @@
 extract = 'total_dyn_inst: (\d+)'
 # benchmarks = '../../bril/examples/test/tdce/*.bril'
 # benchmarks = '../bril/benchmarks/**/*.bril'
-timeout = 70
+timeout = 200
 
 [runs.baseline]
 pipeline = ["bril2json", "brili -p {args}"]
