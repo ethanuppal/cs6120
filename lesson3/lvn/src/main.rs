@@ -154,6 +154,48 @@ pub fn lvn(block: &mut BasicBlock) {
                 dest,
                 funcs,
                 labels,
+                op: ValueOps::Alloc,
+                pos,
+                op_type,
+            } => {
+                let is_overwritten =
+                    last_assignment.get(dest).copied().unwrap() > i;
+                let new_args = args
+                    .iter()
+                    .map(|arg| {
+                        table
+                            .get_value(arg)
+                            .map(OpArg::Value)
+                            .unwrap_or(OpArg::Unknown(arg.clone()))
+                    })
+                    .collect::<Vec<_>>();
+                match table.add_value_and_get_existing_variable(
+                    Value::LeftAlone(NeverEqual),
+                    dest,
+                    is_overwritten,
+                ) {
+                    (destination, None) => Instruction::Value {
+                        args: new_args
+                            .into_iter()
+                            .map(|value| table.get_canonical_name(value))
+                            .collect(),
+                        dest: destination,
+                        funcs: funcs.clone(),
+                        labels: labels.clone(),
+                        op: ValueOps::Alloc,
+                        pos: pos.clone(),
+                        op_type: op_type.clone(),
+                    },
+                    (destination, Some(replacement_variable)) => {
+                        unreachable!("alloc values should never be recovered")
+                    }
+                }
+            }
+            Instruction::Value {
+                args,
+                dest,
+                funcs,
+                labels,
                 op: ValueOps::Call,
                 pos,
                 op_type,
