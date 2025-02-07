@@ -74,10 +74,11 @@ jobs:
       - name: brench
         run: cd bril/brench ; flit install --symlink
 
-      - name: Test trivial DCE
+      - name: Test trivial DCE and LVN
         run: |
           cd lesson3
           cargo build --package tdce
+          cargo build --package lvn
           bril2json <../bril/examples/test/tdce/combo.bril | brili -p
           bril2json <../bril/examples/test/tdce/combo.bril | ../target/debug/tdce | bril2json | brili -p
 
