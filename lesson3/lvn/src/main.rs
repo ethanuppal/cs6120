@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs, hash::Hash, io, path::PathBuf};
 
 use argh::FromArgs;
-use bril_rs::{Instruction, Program, ValueOps};
+use bril_rs::{Instruction, Literal, Program, Type, ValueOps};
 use build_cfg::{print::print_cfg_as_bril_text, BasicBlock};
 use snafu::{ResultExt, Whatever};
 
@@ -36,9 +36,10 @@ impl Hash for NeverEqual {
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 enum Value {
-    Const(String),
+    Float(String),
+    OtherConst(String),
     Op(ValueOps, Vec<OpArg>),
-    Call(NeverEqual),
+    LeftAlone(NeverEqual),
 }
 
 #[derive(Default)]
@@ -119,7 +120,11 @@ pub fn lvn(block: &mut BasicBlock) {
                 let is_overwritten =
                     last_assignment.get(dest).copied().unwrap() > i;
                 match table.add_value_and_get_existing_variable(
-                    Value::Const(value.to_string()),
+                    if matches!(const_type, Type::Float) {
+                        Value::Float(value.to_string())
+                    } else {
+                        Value::OtherConst(value.to_string())
+                    },
                     dest,
                     is_overwritten,
                 ) {
@@ -165,7 +170,7 @@ pub fn lvn(block: &mut BasicBlock) {
                     })
                     .collect::<Vec<_>>();
                 match table.add_value_and_get_existing_variable(
-                    Value::Call(NeverEqual),
+                    Value::LeftAlone(NeverEqual),
                     dest,
                     is_overwritten,
                 ) {
