@@ -30,5 +30,5 @@ test_equivalence:
 		${EQUIV_FLAGS}
 
 # https://stackoverflow.com/questions/8889035/how-to-document-a-makefile
-help:     	## Shows this help.
+help:     	## Shows this help
 	@sed -ne '/@sed/!s/## //p' ${MAKEFILE_LIST}

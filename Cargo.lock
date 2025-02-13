@@ -45,6 +45,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bril-util"
+version = "0.1.0"
+dependencies = [
+ "bril-rs",
+]
+
+[[package]]
 name = "build-cfg"
 version = "0.1.0"
 dependencies = [
@@ -65,6 +72,18 @@ checksum = "5fbd1fe9db3ebf71b89060adaf7b0504c2d6a425cf061313099547e382c2e472"
 dependencies = [
  "serde",
  "toml",
+]
+
+[[package]]
+name = "dataflow"
+version = "0.1.0"
+dependencies = [
+ "argh",
+ "bril-rs",
+ "bril-util",
+ "build-cfg",
+ "serde_json",
+ "snafu",
 ]
 
 [[package]]

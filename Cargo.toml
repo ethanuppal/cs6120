@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["lesson2/build-cfg", "lesson3/lvn", "lesson3/tdce"]
+members = ["lesson2/build-cfg", "lesson3/lvn", "lesson3/tdce", "lesson4/bril-util", "lesson4/dataflow"]
 
 [workspace.package]
 version = "0.1.0"

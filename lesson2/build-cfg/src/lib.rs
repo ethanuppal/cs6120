@@ -75,16 +75,44 @@ pub struct FunctionSignature {
 #[derive(Default)]
 pub struct FunctionCfg {
     pub signature: FunctionSignature,
+    pub entry: BasicBlockIdx,
     pub vertices: SlotMap<BasicBlockIdx, BasicBlock>,
     pub edges: SecondaryMap<BasicBlockIdx, Exit>,
+    rev_edges: SecondaryMap<BasicBlockIdx, Vec<BasicBlockIdx>>,
+}
+
+impl FunctionCfg {
+    pub fn successors(&self, block: BasicBlockIdx) -> Vec<BasicBlockIdx> {
+        match &self.edges[block] {
+            Exit::Fallthrough(destination_idx) => {
+                destination_idx.iter().copied().collect()
+            }
+            Exit::Unconditional(destination_idx) => vec![*destination_idx],
+            Exit::Conditional {
+                condition: _,
+                if_true,
+                if_false,
+            } => vec![*if_true, *if_false],
+            Exit::Return(_) => vec![],
+        }
+    }
+
+    pub fn predecessors(&self, block: BasicBlockIdx) -> &[BasicBlockIdx] {
+        self.rev_edges
+            .get(block)
+            .map_or(&[] as &[BasicBlockIdx], |edges| edges.as_slice())
+    }
 }
 
 struct FunctionCfgBuilder {
     cfg: FunctionCfg,
+    /// Whether the entry point to the CFG has been initialized (in
+    /// `cfg.entry`).
+    entry_is_init: bool,
     current_block: BasicBlock,
     labels_to_blocks: HashMap<String, BasicBlockIdx>,
     previous_idx: Option<BasicBlockIdx>,
-    successors: HashMap<BasicBlockIdx, BasicBlockIdx>,
+    input_block_order: SecondaryMap<BasicBlockIdx, BasicBlockIdx>,
 }
 
 impl FunctionCfgBuilder {
@@ -102,10 +130,11 @@ impl FunctionCfgBuilder {
                 },
                 ..Default::default()
             },
+            entry_is_init: false,
             current_block: BasicBlock::default(),
             labels_to_blocks: HashMap::default(),
             previous_idx: None,
-            successors: HashMap::new(),
+            input_block_order: SecondaryMap::new(),
         }
     }
 
@@ -131,8 +160,13 @@ impl FunctionCfgBuilder {
         let current_block = mem::take(&mut self.current_block);
         let block_idx = self.cfg.vertices.insert(current_block);
 
+        if !self.entry_is_init {
+            self.cfg.entry = block_idx;
+            self.entry_is_init = true;
+        }
+
         if let Some(previous_idx) = self.previous_idx {
-            self.successors.insert(previous_idx, block_idx);
+            self.input_block_order.insert(previous_idx, block_idx);
         }
         self.previous_idx = Some(block_idx);
 
@@ -145,13 +179,20 @@ impl FunctionCfgBuilder {
         for (block_idx, block) in &self.cfg.vertices {
             match &block.exit {
                 LabeledExit::Fallthrough => {
-                    let exit = self
-                        .successors
-                        .get(&block_idx)
-                        .copied()
+                    let after_idx_opt =
+                        self.input_block_order.get(block_idx).copied();
+                    let exit = after_idx_opt
                         .map(|after_idx| Exit::Fallthrough(Some(after_idx)))
                         .unwrap_or(Exit::Fallthrough(None));
                     self.cfg.edges.insert(block_idx, exit);
+                    if let Some(after_idx) = after_idx_opt {
+                        self.cfg
+                            .rev_edges
+                            .entry(after_idx)
+                            .unwrap()
+                            .or_default()
+                            .push(block_idx);
+                    }
                 }
                 LabeledExit::Unconditional { label: always, pos } => {
                     let destination_index = *self
@@ -166,6 +207,12 @@ impl FunctionCfgBuilder {
                         block_idx,
                         Exit::Unconditional(destination_index),
                     );
+                    self.cfg
+                        .rev_edges
+                        .entry(destination_index)
+                        .unwrap()
+                        .or_default()
+                        .push(block_idx);
                 }
                 LabeledExit::Conditional {
                     condition,
@@ -197,6 +244,18 @@ impl FunctionCfgBuilder {
                             if_false: if_false_index,
                         },
                     );
+                    self.cfg
+                        .rev_edges
+                        .entry(if_true_index)
+                        .unwrap()
+                        .or_default()
+                        .push(block_idx);
+                    self.cfg
+                        .rev_edges
+                        .entry(if_false_index)
+                        .unwrap()
+                        .or_default()
+                        .push(block_idx);
                 }
                 LabeledExit::Return(value) => {
                     self.cfg

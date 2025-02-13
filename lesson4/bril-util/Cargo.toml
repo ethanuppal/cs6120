@@ -1,0 +1,8 @@
+[package]
+name = "bril-util"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+
+[dependencies]
+bril-rs.workspace = true
