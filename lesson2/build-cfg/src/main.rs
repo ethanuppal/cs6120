@@ -51,7 +51,7 @@ fn print_reconstructed(program: Program) -> Result<(), Whatever> {
     }
 
     for function in &program.functions {
-        let cfg = build_cfg(function).whatever_context(format!(
+        let cfg = build_cfg(function, false).whatever_context(format!(
             "Failed to build control-flow graph for function `{}`",
             function.name
         ))?;
@@ -66,7 +66,7 @@ fn print_pretty(program: Program) -> Result<(), Whatever> {
     let mut f = IndentWriter::new(&mut stdout, 4);
 
     for function in &program.functions {
-        let cfg = build_cfg(function).whatever_context(format!(
+        let cfg = build_cfg(function, true).whatever_context(format!(
             "Failed to build control-flow graph for function `{}`",
             function.name
         ))?;
@@ -227,7 +227,7 @@ fn print_pretty(program: Program) -> Result<(), Whatever> {
         }
 
         f.decrease_indent();
-        writeln!(f, "}}\n").whatever_context("Writing to stdout failed")?;
+        writeln!(f, "\n}}\n").whatever_context("Writing to stdout failed")?;
     }
 
     Ok(())

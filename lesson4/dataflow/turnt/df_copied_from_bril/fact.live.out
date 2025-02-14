@@ -1,0 +1,8 @@
+@main {
+  in:  ∅
+  .header
+  in:  i, result
+  .body
+  in:  i, result
+  .end
+  in:  result

@@ -411,7 +411,7 @@ fn main() -> Result<(), Whatever> {
         println!("{}", import);
     }
     for function in program.functions {
-        let mut cfg = build_cfg::build_cfg(&function)
+        let mut cfg = build_cfg::build_cfg(&function, false)
             .whatever_context("Failed to build cfg")?;
 
         for block in cfg.vertices.values_mut() {

@@ -122,8 +122,19 @@ jobs:
       - name: Install Turnt part 2
         run: cd turnt ; flit install --symlink
 
-      - name: Test dataflow
+      - name: Test reaching definitions analysis
         run: |
           cd lesson4/dataflow
           python3 check.py def ../../bril/benchmarks/**/*.bril ../../bril/examples/test/df/*.bril
+      - name: Test live variables analysis
+        run: |
+          cd lesson4/dataflow
+          python3 match_outputs.py \
+            "python3 ../../bril/examples/df.py live | grep '  in:'" \
+            "cargo run --package dataflow --quiet -- --analysis live | grep in:" \
+            ../../bril/benchmarks/core/*.bril ../../bril/examples/test/df/*.bril \
+            --exclude is-decreasing.bril --exclude recfact.bril --exclude relative-primes.bril # differ on definition of basic block
+      - name: Snapshot test analyses on examples/test/df/ programs
+        run: |
+          cd lesson4/dataflow
           cd turnt && turnt df_copied_from_bril/*.bril

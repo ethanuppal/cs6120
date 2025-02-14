@@ -1,0 +1,8 @@
+@main {
+  in:  ∅
+  .left
+  in:  a
+  .right
+  in:  ∅
+  .end
+  in:  a, c

@@ -2,9 +2,9 @@
 command = "bril2json < {filename} | cargo run --quiet -- --analysis def"
 output."def.out" = "-"
 
-# [envs.live]
-# command = "bril2json < {filename} | python3 ../../df.py live"
-# output."live.out" = "-"
+[envs.live]
+command = "bril2json < {filename} | cargo run --quiet -- --analysis live"
+output."live.out" = "-"
 #
 # [envs.cprop]
 # command = "bril2json < {filename} | python3 ../../df.py cprop"

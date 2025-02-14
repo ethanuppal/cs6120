@@ -12,13 +12,16 @@ use bril_rs::Program;
 use build_cfg::{
     slotmap::SecondaryMap, BasicBlock, BasicBlockIdx, FunctionCfg,
 };
+use live_variables::live_variables;
 use reaching_definitions::reaching_definitions;
 use snafu::{whatever, ResultExt, Whatever};
 
+pub mod live_variables;
 pub mod reaching_definitions;
 
 enum Analysis {
     ReachingDefinitions,
+    LiveVariables,
 }
 
 impl FromStr for Analysis {
@@ -27,6 +30,7 @@ impl FromStr for Analysis {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             "def" => Self::ReachingDefinitions,
+            "live" => Self::LiveVariables,
             _ => whatever!("Unknown analysis '{}'", s),
         })
     }
@@ -143,11 +147,12 @@ fn main() -> Result<(), Whatever> {
     };
 
     for function in program.functions {
-        let cfg = build_cfg::build_cfg(&function)
+        let cfg = build_cfg::build_cfg(&function, true)
             .whatever_context("Failed to build cfg")?;
 
         match opts.analysis {
             Analysis::ReachingDefinitions => reaching_definitions(&cfg),
+            Analysis::LiveVariables => live_variables(&cfg),
         }
     }
 
