@@ -1,0 +1,26 @@
+@main {
+    i = Constant("8", false)
+    result = Constant("1", false)
+  .header
+    cond = Op("gt", ["i", "zero"], [], [])
+    i = Constant("8", false)
+    i = Op("sub", ["i", "one"], [], [])
+    one = Constant("1", false)
+    result = Constant("1", false)
+    result = Op("mul", ["result", "i"], [], [])
+    zero = Constant("0", false)
+  .body
+    cond = Op("gt", ["i", "zero"], [], [])
+    i = Op("sub", ["i", "one"], [], [])
+    one = Constant("1", false)
+    result = Op("mul", ["result", "i"], [], [])
+    zero = Constant("0", false)
+  .end
+    cond = Op("gt", ["i", "zero"], [], [])
+    i = Constant("8", false)
+    i = Op("sub", ["i", "one"], [], [])
+    one = Constant("1", false)
+    result = Constant("1", false)
+    result = Op("mul", ["result", "i"], [], [])
+    zero = Constant("0", false)
+}

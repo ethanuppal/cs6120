@@ -1,0 +1,24 @@
+@main {
+    a = Constant("47", false)
+    b = Constant("42", false)
+    cond = Argument
+  .left
+    a = Constant("47", false)
+    b = Constant("1", false)
+    c = Constant("5", false)
+    cond = Argument
+  .right
+    a = Constant("2", false)
+    b = Constant("42", false)
+    c = Constant("10", false)
+    cond = Argument
+  .end
+    a = Constant("2", false)
+    a = Constant("47", false)
+    b = Constant("1", false)
+    b = Constant("42", false)
+    c = Constant("10", false)
+    c = Constant("5", false)
+    cond = Argument
+    d = Op("sub", ["a", "c"], [], [])
+}

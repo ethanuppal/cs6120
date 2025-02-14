@@ -67,7 +67,7 @@ pub fn reaching_definitions(cfg: &FunctionCfg) {
         }
         inputs
     }
-    println!("\x1b[33;1m@{}\x1b[m {{", cfg.signature.name);
+    println!("@{} {{", cfg.signature.name);
     for (block, solution) in solve_dataflow(
         cfg,
         Direction::Forward,
@@ -86,10 +86,17 @@ pub fn reaching_definitions(cfg: &FunctionCfg) {
         transfer,
     ) {
         if let Some(label) = &cfg.vertices[block].label {
-            println!("\x1b[1;33m  .{}:\x1b[m", label.name);
+            println!("  .{}", label.name);
         }
-        for definition in &solution {
-            println!("\x1b[2m    {} = {:?}\x1b[m", definition.0, definition.1);
+        let mut printouts = solution
+            .iter()
+            .map(|definition| {
+                format!("    {} = {:?}", definition.0, definition.1)
+            })
+            .collect::<Vec<_>>();
+        printouts.sort();
+        for printout in printouts {
+            println!("{}", printout);
         }
 
         for definition in solution {

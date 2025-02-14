@@ -11,7 +11,7 @@ def check_file(args):
     (file, analysis) = args
     print(f"\x1b[33m{file} START\x1b[m")
     result = subprocess.run(
-        f"bril2json <{file} | cargo run --quiet -- --analysis {analysis}",
+        f"bril2json <{file} | cargo run --package dataflow --quiet -- --analysis {analysis}",
         shell=True,
         capture_output=True,
     )

@@ -113,7 +113,17 @@ jobs:
       - name: Install Python tools
         run: cd bril/bril-txt ; flit install --symlink
 
+      - name: Install Turnt
+        # run: pip install turnt  # Use instead if pip turnt version >= 1.7
+        uses: actions/checkout@v4
+        with:
+          repository: cucapra/turnt
+          path: './turnt'
+      - name: Install Turnt part 2
+        run: cd turnt ; flit install --symlink
+
       - name: Test dataflow
         run: |
           cd lesson4/dataflow
           python3 check.py def ../../bril/benchmarks/**/*.bril ../../bril/examples/test/df/*.bril
+          cd turnt && turnt df_copied_from_bril/*.bril
