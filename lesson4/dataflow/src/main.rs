@@ -9,11 +9,13 @@ use std::{
 
 use argh::FromArgs;
 use bril_rs::Program;
-use bril_util::{InstructionExt, InstructionValue};
 use build_cfg::{
     slotmap::SecondaryMap, BasicBlock, BasicBlockIdx, FunctionCfg,
 };
+use reaching_definitions::reaching_definitions;
 use snafu::{whatever, ResultExt, Whatever};
+
+pub mod reaching_definitions;
 
 enum Analysis {
     ReachingDefinitions,
@@ -30,7 +32,7 @@ impl FromStr for Analysis {
     }
 }
 
-enum Direction {
+pub enum Direction {
     Forward,
     Backward,
 }
@@ -69,12 +71,12 @@ fn construct_postorder(cfg: &FunctionCfg) -> Vec<BasicBlockIdx> {
     traversal
 }
 
-fn solve_dataflow<T: Clone + PartialEq + Eq + Hash>(
+pub fn solve_dataflow<T: Clone + PartialEq + Eq + Hash>(
     cfg: &FunctionCfg,
     direction: Direction,
     entry_inputs: HashSet<T>,
     merge: impl Fn(HashSet<T>, &HashSet<T>) -> HashSet<T>,
-    transfer: impl Fn(&BasicBlock, HashSet<T>) -> HashSet<T>,
+    transfer: impl Fn(&BasicBlock, BasicBlockIdx, HashSet<T>) -> HashSet<T>,
 ) -> SecondaryMap<BasicBlockIdx, HashSet<T>> {
     let postorder_traversal = construct_postorder(cfg);
     let mut blocks = match direction {
@@ -104,7 +106,7 @@ fn solve_dataflow<T: Clone + PartialEq + Eq + Hash>(
         }
 
         let previous_out = solution[current].clone();
-        let new_out = transfer(&cfg.vertices[current], initial_in);
+        let new_out = transfer(&cfg.vertices[current], current, initial_in);
         if new_out != previous_out {
             solution[current] = new_out;
             match direction {
@@ -120,47 +122,6 @@ fn solve_dataflow<T: Clone + PartialEq + Eq + Hash>(
         initial_in = HashSet::new();
     }
     solution
-}
-
-#[derive(PartialEq, Eq, Hash, Clone)]
-struct Definition(String, InstructionValue);
-
-fn reaching_definitions(cfg: &FunctionCfg) {
-    fn transfer(
-        block: &BasicBlock,
-        mut inputs: HashSet<Definition>,
-    ) -> HashSet<Definition> {
-        for instruction in &block.instructions {
-            if let Some(kill) = instruction.kill() {
-                inputs.retain(|input| &input.0 != kill);
-                inputs.insert(Definition(
-                    kill.clone(),
-                    instruction.value().expect("kill without value somehow"),
-                ));
-            }
-        }
-        inputs
-    }
-    for (block, solution) in solve_dataflow(
-        cfg,
-        Direction::Forward,
-        cfg.signature
-            .arguments
-            .iter()
-            .map(|argument| {
-                Definition(argument.name.clone(), InstructionValue::Argument)
-            })
-            .collect(),
-        |lhs, rhs| lhs.union(rhs).cloned().collect(),
-        transfer,
-    ) {
-        if let Some(label) = &cfg.vertices[block].label {
-            println!("{}:", label.name);
-        }
-        for definition in solution {
-            println!("  {} = {:?}", definition.0, definition.1);
-        }
-    }
 }
 
 #[snafu::report]
