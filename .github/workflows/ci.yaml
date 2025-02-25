@@ -167,6 +167,12 @@ jobs:
           cd lesson5/dominators
           python3 ../../lesson4/dataflow/match_outputs.py \
             "python3 ../../bril/examples/dom.py dom | jq 'del(.entry1, .b1, .b2, .b3, .b4, .b5, .b6, .b7, .b8, .b9, .b10) | with_entries(.value |= map(select(. != \"entry1\" and . != \"b1\" and . != \"b2\" and . != \"b3\" and . != \"b4\" and . != \"b5\" and . != \"b6\" and . != \"b7\" and . != \"b8\" and . != \"b9\" and . != \"b10\")))'" \
-            "cargo run --quiet -- | jq" \
+            "cargo run --quiet -- --algo dom | jq" \
             ../../bril/examples/test/dom/*.bril \
             ../../bril/benchmarks/**/*.bril
+          python3 ../../lesson4/dataflow/match_outputs.py \
+            "python3 ../../bril/examples/dom.py tree | jq 'del(.entry1, .b1, .b2, .b3, .b4, .b5, .b6, .b7, .b8, .b9, .b10) | with_entries(.value |= map(select(. != \"entry1\" and . != \"b1\" and . != \"b2\" and . != \"b3\" and . != \"b4\" and . != \"b5\" and . != \"b6\" and . != \"b7\" and . != \"b8\" and . != \"b9\" and . != \"b10\")))'" \
+            "cargo run --quiet -- --algo tree | jq" \
+            ../../bril/examples/test/dom/*.bril \
+            ../../bril/benchmarks/**/*.bril
+

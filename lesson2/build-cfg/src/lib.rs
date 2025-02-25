@@ -14,7 +14,7 @@ pub mod print;
 
 pub use slotmap;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Label {
     pub name: String,
 }

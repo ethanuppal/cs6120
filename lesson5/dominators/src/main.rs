@@ -2,18 +2,41 @@ use std::{
     collections::{BTreeMap, HashSet},
     fs, io,
     path::PathBuf,
+    str::FromStr,
 };
 
 use argh::FromArgs;
 use bril_rs::Program;
-use build_cfg::slotmap::SecondaryMap;
+use build_cfg::{slotmap::SecondaryMap, BasicBlockIdx, FunctionCfg};
 use dataflow::construct_postorder;
 use serde_json::json;
-use snafu::{ResultExt, Whatever};
+use snafu::{whatever, ResultExt, Whatever};
 
+enum Algorithm {
+    Dominators,
+    DominatorTree,
+    DominationFrontier,
+}
+
+impl FromStr for Algorithm {
+    type Err = Whatever;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "dom" => Self::Dominators,
+            "tree" => Self::DominatorTree,
+            "front" => Self::DominationFrontier,
+            _ => whatever!("Unknown algorithm '{}'", s),
+        })
+    }
+}
 /// computes dominators and related stuff
 #[derive(FromArgs)]
 struct Opts {
+    /// algorithm
+    #[argh(option)]
+    algo: Algorithm,
+
     /// input Bril file: omit for stdin
     #[argh(positional)]
     input: Option<PathBuf>,
@@ -78,28 +101,88 @@ fn main() -> Result<(), Whatever> {
             }
         }
 
-        let mut printout = BTreeMap::new();
-        for (block_idx, dominators) in dominators {
-            if let Some(label) = cfg.vertices[block_idx]
-                .label
-                .as_ref()
-                .map(|label| label.name.as_str())
-            {
-                let mut dominators = dominators
-                    .into_iter()
-                    .flat_map(|idx| {
-                        cfg.vertices[idx]
-                            .label
-                            .as_ref()
-                            .map(|label| label.name.as_str())
-                    })
-                    .collect::<Vec<_>>();
-                dominators.sort();
-                printout.insert(label, dominators);
+        match &opts.algo {
+            Algorithm::Dominators => {
+                print_block_info_sorted(&cfg, dominators);
             }
+            Algorithm::DominatorTree => {
+                let mut rev = SecondaryMap::<_, HashSet<_>>::new();
+                for (idx, edge) in dominators {
+                    for dest_idx in edge {
+                        let entry = rev.entry(dest_idx).unwrap().or_default();
+                        if idx != dest_idx {
+                            entry.insert(idx);
+                        }
+                    }
+                }
+
+                let mut tree = SecondaryMap::<_, HashSet<_>>::new();
+
+                for (idx, mut dominated) in rev.clone() {
+                    for (other_idx, other_dominated) in &rev {
+                        if other_idx != idx && !other_dominated.contains(&idx) {
+                            dominated.retain(|dominated_idx| {
+                                !other_dominated.contains(dominated_idx)
+                            });
+                        }
+                    }
+                    tree.insert(idx, dominated);
+                }
+
+                print_block_info_sorted(&cfg, tree);
+
+                //
+                ////let mut visited = SecondaryMap::new();
+                ////let mut bfs = VecDeque::new();
+                ////bfs.push_back(cfg.entry);
+                ////
+                ////let mut tree = SecondaryMap::<_, HashSet<_>>::new();
+                ////
+                ////while let Some(block_idx) = bfs.pop_front() {
+                ////    visited.insert(block_idx, ());
+                ////
+                ////    for neighbor_idx in &rev[block_idx] {
+                ////        if !visited.contains_key(*neighbor_idx) {
+                ////            bfs.push_back(*neighbor_idx);
+                ////            tree.entry(block_idx)
+                ////                .unwrap()
+                ////                .or_default()
+                ////                .insert(*neighbor_idx);
+                ////        }
+                ////    }
+                ////}
+                //
+            }
+            _ => todo!(),
         }
-        println!("{}", json!(printout));
     }
 
     Ok(())
+}
+
+fn print_block_info_sorted(
+    cfg: &FunctionCfg,
+    blocks: SecondaryMap<BasicBlockIdx, HashSet<BasicBlockIdx>>,
+) {
+    let mut printout = BTreeMap::new();
+    for (block_idx, block_info) in blocks {
+        if let Some(label) = cfg.vertices[block_idx]
+            .label
+            .as_ref()
+            .map(|label| label.name.as_str())
+        {
+            let mut dominators = block_info
+                .into_iter()
+                .flat_map(|idx| {
+                    cfg.vertices[idx]
+                        .label
+                        .as_ref()
+                        .map(|label| label.name.as_str())
+                })
+                .collect::<Vec<_>>();
+            dominators.sort();
+            printout.insert(label, dominators);
+        }
+    }
+    println!("{}", json!(printout));
 }
