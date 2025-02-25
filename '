@@ -1,416 +1,151 @@
-// Copyright (C) 2024 Ethan Uppal. All rights reserved.
-//
-// Please see the LICENSE file in the project root directory.
+name: CI
 
-use std::{collections::HashMap, mem};
+on:
+  push:
+    branches:
+     - main
+  pull_request:
+    branches:
+     - main
 
-use bril_rs::{
-    Argument, Code, EffectOps, Function, Instruction, Position, Type,
-};
-use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
-use snafu::{whatever, OptionExt, Whatever};
+env:
+  CARGO_INCREMENTAL: 1
 
-pub mod print;
+jobs:
+  lesson2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
-pub use slotmap;
+      - name: Clone Bril
+        run: rm -rf bril && git clone https://github.com/sampsyo/bril && cd bril && git reset --hard 94764e92585c7133d08ac14cf3c563d1d272434a
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Label {
-    pub name: String,
-}
+      - uses: actions/setup-python@v4
+        with:
+            python-version: '3.11'
+            cache: pip
+            cache-dependency-path: /bril/bril-txt/pyproject.toml
 
-new_key_type! { pub struct BasicBlockIdx; }
+      - name: Install Flit
+        run: pip install flit
+      - name: Install Python tools
+        run: cd bril/bril-txt ; flit install --symlink
 
-impl BasicBlockIdx {
-    pub fn as_number(&self) -> u64 {
-        // hacky, but it doesn't really matter here
-        self.data().as_ffi()
-    }
-}
+      - name: Install Turnt
+        # run: pip install turnt  # Use instead if pip turnt version >= 1.7
+        uses: actions/checkout@v4
+        with:
+          repository: cucapra/turnt
+          path: './turnt'
+      - name: Install Turnt part 2
+        run: cd turnt ; flit install --symlink
 
-#[derive(Default)]
-pub struct BasicBlock {
-    pub is_entry: bool,
-    pub label: Option<Label>,
-    pub instructions: Vec<Instruction>,
-    pub exit: LabeledExit,
-}
+      - name: Test build-cfg
+        run: make build_cfg \
+            ROOT="/home/runner/work/cs6120/cs6120" \
+            BRIL="bril"
+  lesson3:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
-#[derive(Default)]
-pub enum LabeledExit {
-    #[default]
-    Fallthrough,
-    Unconditional {
-        label: String,
-        pos: Option<Position>,
-    },
-    Conditional {
-        condition: String,
-        if_true_label: String,
-        if_false_label: String,
-        pos: Option<Position>,
-    },
-    Return(Option<String>),
-}
+      - name: Clone Bril
+        run: rm -rf bril && git clone https://github.com/sampsyo/bril
 
-#[derive(Clone)]
-pub enum Exit {
-    Fallthrough(Option<BasicBlockIdx>),
-    Unconditional(BasicBlockIdx),
-    Conditional {
-        condition: String,
-        if_true: BasicBlockIdx,
-        if_false: BasicBlockIdx,
-    },
-    Return(Option<String>),
-}
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+     
+      - name: Install brili
+        run: cd bril && deno install --global brili.ts 
 
-#[derive(Default)]
-pub struct FunctionSignature {
-    pub name: String,
-    pub arguments: Vec<Argument>,
-    pub return_type: Option<Type>,
-}
+      - uses: actions/setup-python@v4
+        with:
+            python-version: '3.11'
+            cache: pip
+            cache-dependency-path: bril/bril-txt/pyproject.toml
 
-#[derive(Default)]
-pub struct FunctionCfg {
-    pub signature: FunctionSignature,
-    pub entry: BasicBlockIdx,
-    pub vertices: SlotMap<BasicBlockIdx, BasicBlock>,
-    pub edges: SecondaryMap<BasicBlockIdx, Exit>,
-    rev_edges: SecondaryMap<BasicBlockIdx, Vec<BasicBlockIdx>>,
-}
+      - name: Install Flit
+        run: pip install flit
+      - name: bril-txt
+        run: cd bril/bril-txt ; flit install --symlink
+      - name: brench
+        run: cd bril/brench ; flit install --symlink
 
-impl FunctionCfg {
-    pub fn successors(&self, block: BasicBlockIdx) -> Vec<BasicBlockIdx> {
-        match &self.edges[block] {
-            Exit::Fallthrough(destination_idx) => {
-                destination_idx.iter().copied().collect()
-            }
-            Exit::Unconditional(destination_idx) => vec![*destination_idx],
-            Exit::Conditional {
-                condition: _,
-                if_true,
-                if_false,
-            } => vec![*if_true, *if_false],
-            Exit::Return(_) => vec![],
-        }
-    }
+      - name: Test trivial DCE and LVN
+        run: |
+          cd lesson3
+          cargo build --package tdce
+          cargo build --package lvn
+          bril2json <../bril/examples/test/tdce/combo.bril | brili -p
+          bril2json <../bril/examples/test/tdce/combo.bril | ../target/debug/tdce | bril2json | brili -p
 
-    pub fn predecessors(&self, block: BasicBlockIdx) -> &[BasicBlockIdx] {
-        self.rev_edges
-            .get(block)
-            .map_or(&[] as &[BasicBlockIdx], |edges| edges.as_slice())
-    }
-}
+          cat ../bril/examples/test/tdce/combo.bril | tail -n +2 > ../bril/examples/test/tdce/combo.bril.temp
+          cat ../bril/examples/test/tdce/combo.bril.temp > ../bril/examples/test/tdce/combo.bril
 
-struct FunctionCfgBuilder {
-    cfg: FunctionCfg,
-    /// Whether the entry point to the CFG has been initialized (in
-    /// `cfg.entry`).
-    entry_is_init: bool,
-    current_block: BasicBlock,
-    labels_to_blocks: HashMap<String, BasicBlockIdx>,
-    previous_idx: Option<BasicBlockIdx>,
-    input_block_order: SecondaryMap<BasicBlockIdx, BasicBlockIdx>,
-}
+          cat ../bril/examples/test/tdce/double-pass.bril | tail -n +2 > ../bril/examples/test/tdce/double-pass.bril.temp
+          cat ../bril/examples/test/tdce/double-pass.bril.temp > ../bril/examples/test/tdce/double-pass.bril
 
-impl FunctionCfgBuilder {
-    pub fn new(
-        name: String,
-        arguments: Vec<Argument>,
-        return_type: Option<Type>,
-    ) -> Self {
-        Self {
-            cfg: FunctionCfg {
-                signature: FunctionSignature {
-                    name,
-                    arguments,
-                    return_type,
-                },
-                ..Default::default()
-            },
-            entry_is_init: false,
-            current_block: BasicBlock::default(),
-            labels_to_blocks: HashMap::default(),
-            previous_idx: None,
-            input_block_order: SecondaryMap::new(),
-        }
-    }
+          cat ../bril/examples/test/tdce/reassign-dkp.bril | tail -n +2 > ../bril/examples/test/tdce/reassign-dkp.bril.temp
+          cat ../bril/examples/test/tdce/reassign-dkp.bril.temp > ../bril/examples/test/tdce/reassign-dkp.bril
 
-    pub fn add_to_current(&mut self, instruction: Instruction) {
-        self.current_block.instructions.push(instruction);
-    }
+          brench brench.toml ../bril/benchmarks/**/*.bril ../bril/examples/test/tdce/*.bril | grep connected-components --invert-match | python3 check_brench.py
 
-    pub fn set_current_label(&mut self, name: String) {
-        self.current_block.label = Some(Label { name });
-    }
+  lesson4:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
 
-    pub fn set_current_exit(&mut self, exit: LabeledExit) {
-        assert!(!matches!(exit, LabeledExit::Fallthrough));
-        self.current_block.exit = exit;
-    }
+      - name: Clone Bril
+        run: rm -rf bril && git clone https://github.com/sampsyo/bril && cd bril && git reset --hard 94764e92585c7133d08ac14cf3c563d1d272434a
 
-    pub fn mark_current_as_entry(&mut self) {
-        self.current_block.is_entry = true;
-    }
+      - uses: actions/setup-python@v4
+        with:
+            python-version: '3.11'
+            cache: pip
+            cache-dependency-path: /bril/bril-txt/pyproject.toml
 
-    pub fn finish_current_and_start_new_block(&mut self) {
-        let current_label = self.current_block.label.clone();
-        let current_block = mem::take(&mut self.current_block);
-        let block_idx = self.cfg.vertices.insert(current_block);
+      - name: Install Flit
+        run: pip install flit
+      - name: Install Python tools
+        run: cd bril/bril-txt ; flit install --symlink
 
-        if !self.entry_is_init {
-            self.cfg.entry = block_idx;
-            self.entry_is_init = true;
-        }
+      - name: Install Turnt
+        # run: pip install turnt  # Use instead if pip turnt version >= 1.7
+        uses: actions/checkout@v4
+        with:
+          repository: cucapra/turnt
+          path: './turnt'
+      - name: Install Turnt part 2
+        run: cd turnt ; flit install --symlink
 
-        if let Some(previous_idx) = self.previous_idx {
-            self.input_block_order.insert(previous_idx, block_idx);
-        }
-        self.previous_idx = Some(block_idx);
+      - name: Test reaching definitions analysis
+        run: |
+          cd lesson4/dataflow
+          python3 check.py def ../../bril/benchmarks/**/*.bril ../../bril/examples/test/df/*.bril
+      - name: Test live variables analysis
+        run: |
+          cd lesson4/dataflow
+          python3 match_outputs.py \
+            "python3 ../../bril/examples/df.py live | grep '  in:'" \
+            "cargo run --package dataflow --quiet -- --analysis live | grep in:" \
+            ../../bril/benchmarks/core/*.bril ../../bril/examples/test/df/*.bril \
+            --exclude is-decreasing.bril --exclude recfact.bril --exclude relative-primes.bril # differ on definition of basic block
+      - name: Snapshot test analyses on examples/test/df/ programs
+        run: |
+          cd lesson4/dataflow
+          cd turnt && turnt df_copied_from_bril/*.bril
 
-        if let Some(label) = current_label {
-            self.labels_to_blocks.insert(label.name.clone(), block_idx);
-        }
-    }
-
-    pub fn finish(mut self, prune: bool) -> Result<FunctionCfg, Whatever> {
-        for (block_idx, block) in &self.cfg.vertices {
-            match &block.exit {
-                LabeledExit::Fallthrough => {
-                    let after_idx_opt =
-                        self.input_block_order.get(block_idx).copied();
-                    let exit = after_idx_opt
-                        .map(|after_idx| Exit::Fallthrough(Some(after_idx)))
-                        .unwrap_or(Exit::Fallthrough(None));
-                    self.cfg.edges.insert(block_idx, exit);
-                    if let Some(after_idx) = after_idx_opt {
-                        self.cfg
-                            .rev_edges
-                            .entry(after_idx)
-                            .unwrap()
-                            .or_default()
-                            .push(block_idx);
-                    }
-                }
-                LabeledExit::Unconditional { label: always, pos } => {
-                    let destination_index = *self
-                        .labels_to_blocks
-                        .get(always)
-                        .whatever_context(format!(
-                            "Unknown label {} referenced at {}",
-                            always,
-                            pos_to_string(pos.as_ref())
-                        ))?;
-                    self.cfg.edges.insert(
-                        block_idx,
-                        Exit::Unconditional(destination_index),
-                    );
-                    self.cfg
-                        .rev_edges
-                        .entry(destination_index)
-                        .unwrap()
-                        .or_default()
-                        .push(block_idx);
-                }
-                LabeledExit::Conditional {
-                    condition,
-                    if_true_label,
-                    if_false_label,
-                    pos,
-                } => {
-                    let if_true_index = *self
-                        .labels_to_blocks
-                        .get(if_true_label)
-                        .whatever_context(format!(
-                            "Unknown label {} referenced at {}",
-                            if_true_label,
-                            pos_to_string(pos.as_ref())
-                        ))?;
-                    let if_false_index = *self
-                        .labels_to_blocks
-                        .get(if_false_label)
-                        .whatever_context(format!(
-                            "Unknown label {} referenced at {}",
-                            if_false_label,
-                            pos_to_string(pos.as_ref())
-                        ))?;
-                    self.cfg.edges.insert(
-                        block_idx,
-                        Exit::Conditional {
-                            condition: condition.clone(),
-                            if_true: if_true_index,
-                            if_false: if_false_index,
-                        },
-                    );
-                    self.cfg
-                        .rev_edges
-                        .entry(if_true_index)
-                        .unwrap()
-                        .or_default()
-                        .push(block_idx);
-                    self.cfg
-                        .rev_edges
-                        .entry(if_false_index)
-                        .unwrap()
-                        .or_default()
-                        .push(block_idx);
-                }
-                LabeledExit::Return(value) => {
-                    self.cfg
-                        .edges
-                        .insert(block_idx, Exit::Return(value.clone()));
-                }
-            }
-        }
-
-        if prune {
-            self.cfg.vertices.retain(|idx, _| {
-                if idx == self.cfg.entry {
-                    true
-                } else if let Some(rev_edges) = self.cfg.rev_edges.get(idx) {
-                    !rev_edges.is_empty()
-                } else {
-                    false
-                }
-            });
-            self.cfg
-                .edges
-                .retain(|idx, _| self.cfg.vertices.contains_key(idx));
-            self.cfg
-                .rev_edges
-                .retain(|idx, _| self.cfg.vertices.contains_key(idx));
-            for (_, rev_edges) in self.cfg.rev_edges.iter_mut() {
-                rev_edges.retain(|idx| self.cfg.vertices.contains_key(*idx));
-            }
-        }
-
-        Ok(self.cfg)
-    }
-}
-
-fn pos_to_string(pos: Option<&Position>) -> String {
-    pos.map(|pos| format!("{}:{}", pos.pos.row, pos.pos.col))
-        .unwrap_or("<unknown>".into())
-}
-
-pub fn build_cfg(
-    function: &Function,
-    prune: bool,
-) -> Result<FunctionCfg, Whatever> {
-    let mut builder = FunctionCfgBuilder::new(
-        function.name.clone(),
-        function.args.clone(),
-        function.return_type.clone(),
-    );
-
-    builder.mark_current_as_entry();
-
-    for instruction in &function.instrs {
-        match instruction {
-            Code::Label { label, .. } => {
-                if !builder.current_block.instructions.is_empty()
-                    || builder.current_block.label.is_some()
-                {
-                    builder.finish_current_and_start_new_block();
-                }
-                builder.set_current_label(label.clone());
-            }
-            Code::Instruction(instruction) => match instruction {
-                Instruction::Effect {
-                    labels,
-                    op: EffectOps::Jump,
-                    pos,
-                    ..
-                } => {
-                    builder.add_to_current(instruction.clone());
-
-                    let [destination_label] = labels.as_slice() else {
-                        whatever!(
-                            "Jump operation at {} should take one label",
-                            pos_to_string(pos.as_ref())
-                        );
-                    };
-
-                    builder.set_current_exit(LabeledExit::Unconditional {
-                        label: destination_label.clone(),
-                        pos: pos.clone(),
-                    });
-
-                    builder.finish_current_and_start_new_block();
-                }
-                Instruction::Effect {
-                    args,
-                    labels,
-                    op: EffectOps::Branch,
-                    pos,
-                    ..
-                } => {
-                    builder.add_to_current(instruction.clone());
-
-                    let [condition] = args.as_slice() else {
-                        whatever!(
-                            "Branch operation at {} should take one condition argument",
-                            pos_to_string(pos.as_ref())
-                        );
-                    };
-                    let [if_true_label, if_false_label] = labels.as_slice()
-                    else {
-                        whatever!(
-                            "Branch operation at {} should take two labels",
-                            pos_to_string(pos.as_ref())
-                        );
-                    };
-
-                    builder.set_current_exit(LabeledExit::Conditional {
-                        condition: condition.clone(),
-                        if_true_label: if_true_label.clone(),
-                        if_false_label: if_false_label.clone(),
-                        pos: pos.clone(),
-                    });
-
-                    builder.finish_current_and_start_new_block();
-                }
-                Instruction::Effect {
-                    args,
-                    labels,
-                    op: EffectOps::Return,
-                    pos,
-                    ..
-                } => {
-                    builder.add_to_current(instruction.clone());
-
-                    let value = match args.as_slice() {
-                        [] => None,
-                        [value] => Some(value.clone()),
-                        _ => whatever!(
-                            "Branch operation at {} should take one condition argument",
-                            pos_to_string(pos.as_ref())
-                        )
-                    };
-                    if !labels.is_empty() {
-                        whatever!(
-                            "Return operation at {} should take no labels",
-                            pos_to_string(pos.as_ref())
-                        );
-                    };
-
-                    builder.set_current_exit(LabeledExit::Return(value));
-
-                    builder.finish_current_and_start_new_block();
-                }
-                other => {
-                    builder.add_to_current(other.clone());
-                }
-            },
-        }
-    }
-
-    // for anything leftover
-    //if !builder.current_block_is_empty() {
-    builder.finish_current_and_start_new_block();
-    //}
-
-    builder.finish(prune)
-}
+  lesson5:
+    runs-on: macos-latest
+    steps:
+      - name: Test dominators
+        run: |
+          cd lesson5/dominators
+          python3 ../../lesson4/dataflow/match_outputs.py \
+            "python3 ../../bril/examples/dom.py dom | jq 'del(.entry1?, .b1?, .b2?, .b3?, .b4?, .b5?, .b6?, .b7?, .b8?, .b9?, .b10?) | with_entries(.value |= map(select(. as \$x | [\"entry1\", \"b1\", \"b2\", \"b3\", \"b4\", \"b5\", \"b6\", \"b7\", \"b8\", \"b9\", \"b10\"] | index(\$x) | not))))'" \
+            "cargo run --quiet -- | jq" \
+            ../../bril/examples/test/dom/*.bril

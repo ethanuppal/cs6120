@@ -12,6 +12,7 @@ use bril_rs::Program;
 use build_cfg::{
     slotmap::SecondaryMap, BasicBlock, BasicBlockIdx, FunctionCfg,
 };
+use dataflow::construct_postorder;
 use live_variables::live_variables;
 use reaching_definitions::reaching_definitions;
 use snafu::{whatever, ResultExt, Whatever};
@@ -51,28 +52,6 @@ struct Opts {
     /// input Bril file; omit for stdin
     #[argh(positional)]
     input: Option<PathBuf>,
-}
-
-fn construct_postorder(cfg: &FunctionCfg) -> Vec<BasicBlockIdx> {
-    fn helper(
-        cfg: &FunctionCfg,
-        current: BasicBlockIdx,
-        visited: &mut SecondaryMap<BasicBlockIdx, bool>,
-        traversal: &mut Vec<BasicBlockIdx>,
-    ) {
-        visited.insert(current, true);
-        for successor in cfg.successors(current) {
-            if !visited.contains_key(successor) {
-                helper(cfg, successor, visited, traversal);
-            }
-        }
-        traversal.push(current);
-    }
-
-    let mut traversal = vec![];
-    let mut visited = SecondaryMap::with_capacity(cfg.vertices.capacity());
-    helper(cfg, cfg.entry, &mut visited, &mut traversal);
-    traversal
 }
 
 pub fn solve_dataflow<T: Clone + PartialEq + Eq + Hash>(

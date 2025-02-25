@@ -1,6 +1,13 @@
 [workspace]
 resolver = "2"
-members = ["lesson2/build-cfg", "lesson3/lvn", "lesson3/tdce", "lesson4/bril-util", "lesson4/dataflow"]
+members = [
+  "lesson2/build-cfg",
+  "lesson3/lvn",
+  "lesson3/tdce",
+  "lesson4/bril-util",
+  "lesson4/dataflow",
+  "lesson5/dominators",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,13 +16,13 @@ license-file = "LICENSE"
 
 [workspace.dependencies]
 bril-rs = { git = "https://github.com/sampsyo/bril", features = [
-    "memory",
-    "float",
-    "ssa",
-    "speculate",
-    "position",
-    "import",
-    "char",
+  "memory",
+  "float",
+  "ssa",
+  "speculate",
+  "position",
+  "import",
+  "char",
 ] }
 slotmap = "1.0.7"
 snafu = "0.8.5"

@@ -87,6 +87,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "dominators"
+version = "0.1.0"
+dependencies = [
+ "argh",
+ "bril-rs",
+ "build-cfg",
+ "dataflow",
+ "serde_json",
+ "snafu",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
