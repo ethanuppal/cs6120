@@ -130,30 +130,37 @@ fn main() -> Result<(), Whatever> {
                 }
 
                 print_block_info_sorted(&cfg, tree);
-
-                //
-                ////let mut visited = SecondaryMap::new();
-                ////let mut bfs = VecDeque::new();
-                ////bfs.push_back(cfg.entry);
-                ////
-                ////let mut tree = SecondaryMap::<_, HashSet<_>>::new();
-                ////
-                ////while let Some(block_idx) = bfs.pop_front() {
-                ////    visited.insert(block_idx, ());
-                ////
-                ////    for neighbor_idx in &rev[block_idx] {
-                ////        if !visited.contains_key(*neighbor_idx) {
-                ////            bfs.push_back(*neighbor_idx);
-                ////            tree.entry(block_idx)
-                ////                .unwrap()
-                ////                .or_default()
-                ////                .insert(*neighbor_idx);
-                ////        }
-                ////    }
-                ////}
-                //
             }
-            _ => todo!(),
+            Algorithm::DominationFrontier => {
+                let mut rev = SecondaryMap::<_, HashSet<_>>::new();
+                for (idx, edge) in dominators {
+                    for dest_idx in edge {
+                        let entry = rev.entry(dest_idx).unwrap().or_default();
+                        if idx != dest_idx {
+                            entry.insert(idx);
+                        }
+                    }
+                }
+
+                let mut frontiers = SecondaryMap::<_, HashSet<_>>::new();
+                for (idx, dominated) in rev {
+                    let mut successors = HashSet::new();
+
+                    for dominated_idx in &dominated {
+                        successors.extend(cfg.successors(*dominated_idx));
+                    }
+
+                    // don't forget that a node dominates itself, so we also
+                    // check its own successors (we removed
+                    // this for convenience when constructing rev)
+                    successors.extend(cfg.successors(idx));
+
+                    successors.retain(|idx| !dominated.contains(idx));
+                    frontiers.insert(idx, successors);
+                }
+
+                print_block_info_sorted(&cfg, frontiers);
+            }
         }
     }
 
