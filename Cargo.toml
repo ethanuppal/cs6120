@@ -6,7 +6,7 @@ members = [
   "lesson3/tdce",
   "lesson4/bril-util",
   "lesson4/dataflow",
-  "lesson5/dominators",
+  "lesson5/dominators", "lesson6/ssa",
 ]
 
 [workspace.package]
