@@ -6,7 +6,8 @@ members = [
   "lesson3/tdce",
   "lesson4/bril-util",
   "lesson4/dataflow",
-  "lesson5/dominators", "lesson6/ssa",
+  "lesson5/dominators",
+  "lesson6/ssa",
 ]
 
 [workspace.package]
@@ -23,7 +24,7 @@ bril-rs = { git = "https://github.com/sampsyo/bril", features = [
   "position",
   "import",
   "char",
-] }
+], rev = "bc60765c822852ab574fe8238d33dbe064a94943" }
 slotmap = "1.0.7"
 snafu = "0.8.5"
 argh = "0.1.13"

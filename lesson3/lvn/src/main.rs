@@ -281,7 +281,6 @@ pub fn lvn(block: &mut BasicBlock) {
                         | ValueOps::And
                         | ValueOps::Or
                         | ValueOps::Ceq
-                        | ValueOps::Phi
                 ) {
                     new_args.sort();
                 }
