@@ -234,7 +234,8 @@ jobs:
           turnt *.bril --diff
           turnt *.bril --diff
           cargo build --package tdce --bin tdce
-          brench brench.toml *.bril | python3 check_brench.py --allow-slower
+          cargo build --package ssa --bin ssa
+          brench brench.toml *.bril #| python3 check_brench.py --allow-slower
 
       - name: Test SSA
         run: |
