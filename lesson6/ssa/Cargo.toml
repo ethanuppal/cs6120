@@ -10,4 +10,5 @@ snafu.workspace = true
 bril-rs.workspace = true
 serde_json.workspace = true
 build-cfg = { path = "../../lesson2/build-cfg" }
-# dataflow = { path = "../../lesson4/dataflow/" }
+dataflow = { path = "../../lesson4/dataflow/" }
+dominators = { path = "../../lesson5/dominators/" }

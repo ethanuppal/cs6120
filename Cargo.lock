@@ -272,6 +272,8 @@ dependencies = [
  "argh",
  "bril-rs",
  "build-cfg",
+ "dataflow",
+ "dominators",
  "serde_json",
  "snafu",
 ]

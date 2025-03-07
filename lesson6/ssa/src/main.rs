@@ -7,6 +7,14 @@ use snafu::{ResultExt, Whatever};
 /// Transforms Bril into and out of SSA
 #[derive(FromArgs)]
 struct Opts {
+    /// translate into SSA
+    #[argh(switch)]
+    into_ssa: bool,
+
+    /// translate from SSA
+    #[argh(switch)]
+    from_ssa: bool,
+
     /// input Bril file: omit for stdin
     #[argh(positional)]
     input: Option<PathBuf>,
