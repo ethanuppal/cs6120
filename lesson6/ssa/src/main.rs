@@ -19,6 +19,11 @@ struct Opts {
     #[argh(switch)]
     from_ssa: bool,
 
+    /// skip the step after inserting Phi nodes. ignored unless --into-ssa is
+    /// passed
+    #[argh(switch)]
+    skip_post_phi_insertion: bool,
+
     /// input Bril file: omit for stdin
     #[argh(positional)]
     input: Option<PathBuf>,
@@ -62,21 +67,26 @@ fn main() -> Result<(), Whatever> {
                 );
                 ssa::insert_phis(&mut cfg, phi_insertion_points);
 
-                // 2: Rename variables and insert upsilon nodes
+                if !opts.skip_post_phi_insertion {
+                    // 2: Rename variables and insert upsilon nodes
 
-                let entry = cfg.entry;
-                let mut dominating_definitiions_stacks =
-                    ssa::DominatingDefinitionsStacks::default();
-                let mut undefined_names = BTreeMap::new();
-                ssa::rename_and_insert_upsilons(
-                    &mut cfg,
-                    entry,
-                    &dominance_tree,
-                    &mut dominating_definitiions_stacks,
-                    &mut undefined_names,
-                );
+                    let entry = cfg.entry;
+                    let mut dominating_definitiions_stacks =
+                        ssa::DominatingDefinitionsStacks::default();
+                    let mut undefined_names = BTreeMap::new();
+                    ssa::rename_and_insert_upsilons(
+                        &mut cfg,
+                        entry,
+                        &dominance_tree,
+                        &mut dominating_definitiions_stacks,
+                        &mut undefined_names,
+                    );
 
-                ssa::insert_undefined_names_at_entry(&mut cfg, undefined_names);
+                    ssa::insert_undefined_names_at_entry(
+                        &mut cfg,
+                        undefined_names,
+                    );
+                }
 
                 print::print_cfg_as_bril_text(cfg);
             }
