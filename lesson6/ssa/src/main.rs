@@ -3,9 +3,6 @@ use std::{collections::BTreeMap, fs, io, path::PathBuf};
 use argh::FromArgs;
 use bril_rs::Program;
 use build_cfg::print;
-use dominators::{
-    compute_dominance_frontiers, compute_dominator_tree, compute_dominators,
-};
 use snafu::{whatever, ResultExt, Whatever};
 
 /// Transforms Bril into and out of SSA
@@ -53,10 +50,11 @@ fn main() -> Result<(), Whatever> {
                 let mut cfg = build_cfg::build_cfg(&function, true)
                     .whatever_context("Failed to build cfg")?;
 
-                let dominators = compute_dominators(&cfg);
-                let dominance_tree = compute_dominator_tree(&dominators);
+                let dominators = dominators::compute_dominators(&cfg);
+                let dominance_tree =
+                    dominators::compute_dominator_tree(&dominators);
                 let dominance_frontiers =
-                    compute_dominance_frontiers(&cfg, dominators);
+                    dominators::compute_dominance_frontiers(&cfg, dominators);
 
                 // 1: Insert phi nodes
 
@@ -88,13 +86,19 @@ fn main() -> Result<(), Whatever> {
                     );
                 }
 
+                assert!(
+                    ssa::is_ssa(&cfg),
+                    "Result of SSA transformation was not SSA"
+                );
+
                 print::print_cfg_as_bril_text(cfg);
             }
             (false, true) => {
                 let mut cfg = build_cfg::build_cfg(&function, true)
                     .whatever_context("Failed to build cfg")?;
 
-                ssa::from_ssa(&mut cfg)?;
+                ssa::from_ssa(&mut cfg)
+                    .whatever_context("Failed to convert out of SSA form")?;
 
                 print::print_cfg_as_bril_text(cfg);
             }

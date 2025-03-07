@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use bril_rs::{EffectOps, Instruction, Type, ValueOps};
 use build_cfg::{slotmap::SecondaryMap, BasicBlockIdx, FunctionCfg};
-use snafu::{OptionExt, Whatever};
+use snafu::{whatever, OptionExt, Whatever};
 
 pub struct DefinitionSites(pub BTreeMap<String, (Type, Vec<BasicBlockIdx>)>);
 
@@ -395,7 +395,27 @@ pub fn insert_undefined_names_at_entry(
     }
 }
 
+pub fn is_ssa(cfg: &FunctionCfg) -> bool {
+    let mut definitions = HashSet::new();
+    for block in cfg.vertices.values() {
+        for instruction in &block.instructions {
+            if let Instruction::Constant { dest, .. }
+            | Instruction::Value { dest, .. } = &instruction
+            {
+                if !definitions.insert(dest) {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
 pub fn from_ssa(cfg: &mut FunctionCfg) -> Result<(), Whatever> {
+    if !is_ssa(cfg) {
+        whatever!("Input was not in SSA already");
+    }
+
     let mut set_operation_types = HashMap::new();
     for block in cfg.vertices.values() {
         for instruction in &block.instructions {
