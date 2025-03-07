@@ -1,4 +1,5 @@
 @main() {
+.__SSA_ENTRY:
 .entry:
   i: int = const 1;
   jmp .loop;

@@ -107,7 +107,7 @@ pub struct FunctionCfg {
     pub entry: BasicBlockIdx,
     pub vertices: SlotMap<BasicBlockIdx, BasicBlock>,
     pub edges: SecondaryMap<BasicBlockIdx, Exit>,
-    rev_edges: SecondaryMap<BasicBlockIdx, Vec<BasicBlockIdx>>,
+    pub rev_edges: SecondaryMap<BasicBlockIdx, Vec<BasicBlockIdx>>,
 }
 
 impl FunctionCfg {
@@ -416,7 +416,7 @@ pub fn build_cfg(
                         _ => whatever!(
                             "Branch operation at {} should take one condition argument",
                             pos_to_string(pos.as_ref())
-                        )
+                        ),
                     };
                     if !labels.is_empty() {
                         whatever!(

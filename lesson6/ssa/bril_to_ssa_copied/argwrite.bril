@@ -1,3 +1,4 @@
+# ARGS: 1
 @main(a: int) {
   cond: bool = const true;
   br cond .here .there;

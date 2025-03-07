@@ -1,0 +1,33 @@
+extract = 'total_dyn_inst: (\d+)'
+timeout = 200
+
+[runs.baseline]
+pipeline = ["bril2json", "brili -p {args}"]
+
+[runs.into_ssa]
+pipeline = [
+  "bril2json",
+  "../../../target/debug/ssa --into-ssa",
+  "bril2json",
+  "brili -p {args}",
+]
+
+[runs.through_ssa]
+pipeline = [
+  "bril2json",
+  "../../../target/debug/ssa --into-ssa",
+  "bril2json",
+  "../../../target/debug/ssa --from-ssa",
+  "bril2json",
+  "brili -p {args}",
+]
+
+[runs.ssa_then_tdce]
+pipeline = [
+  "bril2json",
+  "../../../target/debug/ssa --into-ssa",
+  "bril2json",
+  "../../../target/debug/tdce",
+  "bril2json",
+  "brili -p {args}",
+]

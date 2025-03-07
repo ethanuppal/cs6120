@@ -1,4 +1,5 @@
 @main() {
+.__SSA_ENTRY:
   cond: bool = const true;
   br cond .true .false;
 .true:

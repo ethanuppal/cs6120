@@ -1,4 +1,5 @@
 @main(a: int) {
+.__SSA_ENTRY:
 .while.cond:
   a: int = get;
   is_term: bool = get;

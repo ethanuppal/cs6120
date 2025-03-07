@@ -1,4 +1,5 @@
 @main() {
+.__SSA_ENTRY:
 .entry:
   one: int = const 1;
   zero: int = const 0;

@@ -71,9 +71,9 @@ jobs:
 
       - name: Install Flit
         run: pip install flit
-      - name: bril-txt
+      - name: Install Python tools
         run: cd bril/bril-txt ; flit install --symlink
-      - name: brench
+      - name: Install brench
         run: cd bril/brench ; flit install --symlink
 
       - name: Test trivial DCE and LVN
@@ -206,6 +206,13 @@ jobs:
       - name: Sanity check
         run: cargo build --package ssa
 
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+     
+      - name: Install brili
+        run: cd bril && deno install --global brili.ts 
+
       - uses: actions/setup-python@v4
         with:
             python-version: '3.11'
@@ -216,6 +223,8 @@ jobs:
         run: pip install flit
       - name: Install Python tools
         run: cd bril/bril-txt ; flit install --symlink
+      - name: Install brench
+        run: cd bril/brench ; flit install --symlink
 
       - name: Install Turnt
         uses: actions/checkout@v4
@@ -225,21 +234,21 @@ jobs:
       - name: Install Turnt part 2
         run: cd turnt ; flit install --symlink
 
+
       - name: Snapshot test SSA
         run: |
           cd lesson6/ssa/bril_to_ssa_copied
           turnt *.bril --diff
           turnt *.bril --diff
+          cargo build --package tdce --bin tdce
+          cargo build --package ssa --bin ssa
+          brench brench.toml *.bril | python3 check_brench.py --allow-slower
 
       - name: Test SSA
         run: |
           cd lesson6/ssa/
-          # no function arguments
           python3 ../../lesson4/dataflow/match_outputs.py \
             "brili" \
             "cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili" \
             ../../bril/examples/test/to_ssa/*.bril \
-            --exclude if.bril \
-            --exclude argwrite.bril \
-            --exclude loop-branch.bril
-
+            ../../bril/benchmarks/core/*.bril

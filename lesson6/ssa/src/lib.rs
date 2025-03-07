@@ -1,8 +1,34 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use bril_rs::{EffectOps, Instruction, Type, ValueOps};
-use build_cfg::{slotmap::SecondaryMap, BasicBlockIdx, FunctionCfg};
-use snafu::{OptionExt, Whatever};
+use build_cfg::{
+    slotmap::SecondaryMap, BasicBlock, BasicBlockIdx, Exit, FunctionCfg, Label,
+    LabeledExit,
+};
+use snafu::{whatever, OptionExt, Whatever};
+
+pub fn insert_new_empty_entry_block(cfg: &mut FunctionCfg) {
+    cfg.vertices[cfg.entry].is_entry = false;
+
+    let new_entry = cfg.vertices.insert(BasicBlock {
+        is_entry: true,
+        label: Some(Label {
+            name: "__SSA_ENTRY".into(),
+        }),
+        instructions: vec![],
+        exit: LabeledExit::Fallthrough,
+    });
+
+    cfg.edges
+        .insert(new_entry, Exit::Fallthrough(Some(cfg.entry)));
+    cfg.rev_edges
+        .entry(cfg.entry)
+        .unwrap()
+        .or_default()
+        .push(new_entry);
+
+    cfg.entry = new_entry;
+}
 
 pub struct DefinitionSites(pub BTreeMap<String, (Type, Vec<BasicBlockIdx>)>);
 
@@ -98,6 +124,24 @@ pub fn insert_phis(
     }
 }
 
+pub fn simulate_parameters_as_locals(cfg: &mut FunctionCfg) {
+    cfg.vertices[cfg.entry].instructions.splice(
+        0..0,
+        cfg.signature
+            .arguments
+            .iter()
+            .map(|argument| Instruction::Value {
+                args: vec![argument.name.clone()],
+                dest: argument.name.clone(),
+                funcs: vec![],
+                labels: vec![],
+                op: ValueOps::Id,
+                pos: None,
+                op_type: argument.arg_type.clone(),
+            }),
+    );
+}
+
 #[derive(Default)]
 pub struct DominatingDefinitionsStacks {
     /// A stack for each definition that dominates the current block; immediate
@@ -145,14 +189,23 @@ impl DominatingDefinitionsStacks {
 
 pub struct LocalRenamer {
     current_idx: BasicBlockIdx,
+    is_entry: bool,
+    parameters: HashSet<String>,
     current_id: u64,
     numbering: HashMap<String, usize>,
 }
 
 impl LocalRenamer {
-    pub fn new(current_idx: BasicBlockIdx) -> Self {
+    pub fn new(cfg: &FunctionCfg, current_idx: BasicBlockIdx) -> Self {
         Self {
             current_idx,
+            is_entry: cfg.vertices[current_idx].is_entry,
+            parameters: cfg
+                .signature
+                .arguments
+                .iter()
+                .map(|argument| argument.name.clone())
+                .collect(),
             current_id: current_idx.as_index_for_slotmap_version_1_0_7_only(),
             numbering: HashMap::default(),
         }
@@ -178,12 +231,14 @@ impl LocalRenamer {
                 "{name}.{}.{previous_number}",
                 defining_dominator.as_index_for_slotmap_version_1_0_7_only()
             ))
+        } else if self.is_entry && self.parameters.contains(name) {
+            Some(name.to_owned())
         } else {
-            //todo!("LocalRenamer::rewrite_argument: Could not rewrite `{name}`
-            // since it was not defined locally or from a dominator. Don't know
-            // what to do here")
-            // lol a variable is undefined if its definitions do not dominate
-            // its uses right?
+            //todo!("LocalRenamer::rewrite_argument: Could not rewrite
+            // `{name}` since it was not defined locally or
+            // from a dominator. Don't know what to do
+            // here") lol a variable is undefined if its
+            // definitions do not dominate its uses right?
             None
         }
     }
@@ -231,7 +286,7 @@ pub fn rename_and_insert_upsilons(
     dominating_definitions_stacks: &mut DominatingDefinitionsStacks,
     undefined_names: &mut BTreeMap<String, Type>,
 ) {
-    let mut local_renamer = LocalRenamer::new(block_idx);
+    let mut local_renamer = LocalRenamer::new(cfg, block_idx);
 
     for instruction in &mut cfg.vertices[block_idx].instructions {
         *instruction = match instruction.clone() {
@@ -395,7 +450,27 @@ pub fn insert_undefined_names_at_entry(
     }
 }
 
+pub fn is_ssa(cfg: &FunctionCfg) -> bool {
+    let mut definitions = HashSet::new();
+    for block in cfg.vertices.values() {
+        for instruction in &block.instructions {
+            if let Instruction::Constant { dest, .. }
+            | Instruction::Value { dest, .. } = &instruction
+            {
+                if !definitions.insert(dest) {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
 pub fn from_ssa(cfg: &mut FunctionCfg) -> Result<(), Whatever> {
+    if !is_ssa(cfg) {
+        whatever!("Input was not in SSA already");
+    }
+
     let mut set_operation_types = HashMap::new();
     for block in cfg.vertices.values() {
         for instruction in &block.instructions {
