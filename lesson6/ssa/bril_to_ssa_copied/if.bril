@@ -1,3 +1,4 @@
+# ARGS: true
 @main(cond: bool) {
 .entry:
     a: int = const 47;

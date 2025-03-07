@@ -50,6 +50,8 @@ fn main() -> Result<(), Whatever> {
                 let mut cfg = build_cfg::build_cfg(&function, true)
                     .whatever_context("Failed to build cfg")?;
 
+                ssa::insert_new_empty_entry_block(&mut cfg);
+
                 let dominators = dominators::compute_dominators(&cfg);
                 let dominance_tree =
                     dominators::compute_dominator_tree(&dominators);
@@ -67,6 +69,8 @@ fn main() -> Result<(), Whatever> {
 
                 if !opts.skip_post_phi_insertion {
                     // 2: Rename variables and insert upsilon nodes
+
+                    ssa::simulate_parameters_as_locals(&mut cfg);
 
                     let entry = cfg.entry;
                     let mut dominating_definitiions_stacks =

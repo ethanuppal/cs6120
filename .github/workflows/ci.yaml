@@ -230,6 +230,7 @@ jobs:
           cd lesson6/ssa/bril_to_ssa_copied
           turnt *.bril --diff
           turnt *.bril --diff
+          brench brench.toml *.bril | python3 check_brench.py --allow-slower
 
       - name: Test SSA
         run: |
