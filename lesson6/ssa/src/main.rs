@@ -1,4 +1,4 @@
-use std::{fs, io, path::PathBuf};
+use std::{collections::BTreeMap, fs, io, path::PathBuf};
 
 use argh::FromArgs;
 use bril_rs::Program;
@@ -7,7 +7,6 @@ use dominators::{
     compute_dominance_frontiers, compute_dominator_tree, compute_dominators,
 };
 use snafu::{whatever, ResultExt, Whatever};
-use ssa::DominatingDefinitionsStacks;
 
 /// Transforms Bril into and out of SSA
 #[derive(FromArgs)]
@@ -68,15 +67,16 @@ fn main() -> Result<(), Whatever> {
                 let entry = cfg.entry;
                 let mut dominating_definitiions_stacks =
                     ssa::DominatingDefinitionsStacks::default();
+                let mut undefined_names = BTreeMap::new();
                 ssa::rename_and_insert_upsilons(
                     &mut cfg,
                     entry,
                     &dominance_tree,
                     &mut dominating_definitiions_stacks,
+                    &mut undefined_names,
                 );
-                //
-                //dumb_postprocess(&mut cfg,
-                // potential_undefs.into_iter().collect());
+
+                ssa::insert_undefined_names_at_entry(&mut cfg, undefined_names);
 
                 print::print_cfg_as_bril_text(cfg);
             }

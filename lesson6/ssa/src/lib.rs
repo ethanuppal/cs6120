@@ -100,29 +100,42 @@ pub fn insert_phis(
 
 #[derive(Default)]
 pub struct DominatingDefinitionsStacks {
-    inner: HashMap<String, Vec<BasicBlockIdx>>,
+    /// A stack for each definition that dominates the current block; immediate
+    /// dominators will overtake prior ones on the stack. Each stack entry
+    /// consists of the most recently-dominating block defining a variable
+    /// and the local numbering of the last definition.
+    inner: HashMap<String, Vec<(BasicBlockIdx, usize)>>,
 }
 
 impl DominatingDefinitionsStacks {
+    pub fn lookup_latest_dominator_of(
+        &self,
+        definition: &str,
+    ) -> Option<(BasicBlockIdx, usize)> {
+        self.inner
+            .get(definition)
+            .and_then(|stack| stack.last())
+            .copied()
+    }
+
     pub fn with_new_definitions<T>(
         &mut self,
-        current_idx: BasicBlockIdx,
-        new_definitions: &[String],
+        local_renamer: LocalRenamer,
         then: impl FnOnce(&mut Self) -> T,
     ) -> T {
-        for new_definition in new_definitions {
+        for (new_definition, number) in local_renamer.latest_definitions() {
             self.inner
                 .entry(new_definition.clone())
                 .or_default()
-                .push(current_idx);
+                .push((local_renamer.current_idx, number));
         }
         let result = then(self);
-        for new_definition in new_definitions {
+        for (new_definition, _) in local_renamer.latest_definitions() {
             if let Some(stack) = self.inner.get_mut(new_definition) {
-                let popped_idx = stack.pop();
+                let popped_idx = stack.pop().map(|(idx, _)| idx);
                 assert_eq!(
                     popped_idx.expect("We just pushed to this key"),
-                    current_idx
+                    local_renamer.current_idx
                 );
             }
         }
@@ -130,9 +143,85 @@ impl DominatingDefinitionsStacks {
     }
 }
 
-#[derive(Default)]
 pub struct LocalRenamer {
-    inner: HashMap<String, usize>,
+    current_idx: BasicBlockIdx,
+    current_id: u64,
+    numbering: HashMap<String, usize>,
+}
+
+impl LocalRenamer {
+    pub fn new(current_idx: BasicBlockIdx) -> Self {
+        Self {
+            current_idx,
+            current_id: current_idx.as_index_for_slotmap_version_1_0_7_only(),
+            numbering: HashMap::default(),
+        }
+    }
+
+    pub fn rewrite_destination(&mut self, name: String) -> String {
+        let entry = self.numbering.entry(name.clone()).or_insert(0);
+        *entry += 1;
+        format!("{}.{}.{}", name, self.current_id, *entry)
+    }
+
+    pub fn rewrite_argument(
+        &self,
+        dominating_definitions_stacks: &DominatingDefinitionsStacks,
+        name: &str,
+    ) -> Option<String> {
+        if let Some(current_number) = self.numbering.get(name).copied() {
+            Some(format!("{name}.{}.{current_number}", self.current_id))
+        } else if let Some((defining_dominator, previous_number)) =
+            dominating_definitions_stacks.lookup_latest_dominator_of(name)
+        {
+            Some(format!(
+                "{name}.{}.{previous_number}",
+                defining_dominator.as_index_for_slotmap_version_1_0_7_only()
+            ))
+        } else {
+            //todo!("LocalRenamer::rewrite_argument: Could not rewrite `{name}`
+            // since it was not defined locally or from a dominator. Don't know
+            // what to do here")
+            // lol a variable is undefined if its definitions do not dominate
+            // its uses right?
+            None
+        }
+    }
+
+    pub fn rewrite_arguments(
+        &mut self,
+        dominating_definitions_stacks: &DominatingDefinitionsStacks,
+        names: impl IntoIterator<Item = String>,
+    ) -> Vec<String> {
+        names
+            .into_iter()
+            .map(|name| {
+                self.rewrite_argument(dominating_definitions_stacks, &name)
+                    .expect(
+                        "Definitions of arguments did not dominate their uses",
+                    )
+            })
+            .collect()
+    }
+
+    /// This function is very cheap.
+    pub fn latest_definitions(
+        &self,
+    ) -> impl Iterator<Item = (&String, usize)> + '_ {
+        self.numbering
+            .iter()
+            .map(|(definition, current_number)| (definition, *current_number))
+    }
+
+    //
+    ///// Whether `name` refers to a function parameter or whether it is
+    ///// currently defined or defined in a dominator.
+    //fn resolves_to_parameter(
+    //    &self,
+    //    dominating_definitions_stacks: &DominatingDefinitionsStacks
+    //    name: &str,
+    //) -> bool {
+    //}
 }
 
 pub fn rename_and_insert_upsilons(
@@ -140,256 +229,157 @@ pub fn rename_and_insert_upsilons(
     block_idx: BasicBlockIdx,
     dominance_tree: &SecondaryMap<BasicBlockIdx, HashSet<BasicBlockIdx>>,
     dominating_definitions_stacks: &mut DominatingDefinitionsStacks,
-    //other_undefs: &mut HashSet<(String, Type)>,
+    undefined_names: &mut BTreeMap<String, Type>,
 ) {
-    let block_idx_number = block_idx.as_index_for_slotmap_version_1_0_7_only();
+    let mut local_renamer = LocalRenamer::new(block_idx);
 
-    let mut local_renamer = LocalRenamer::default();
+    for instruction in &mut cfg.vertices[block_idx].instructions {
+        *instruction = match instruction.clone() {
+            Instruction::Constant {
+                dest,
+                op,
+                pos,
+                const_type,
+                value,
+            } => Instruction::Constant {
+                dest: local_renamer.rewrite_destination(dest),
+                op,
+                pos,
+                const_type,
+                value,
+            },
+            Instruction::Value {
+                args,
+                dest,
+                funcs,
+                labels,
+                op,
+                pos,
+                op_type,
+            } => Instruction::Value {
+                args: local_renamer
+                    .rewrite_arguments(dominating_definitions_stacks, args),
+                dest: local_renamer.rewrite_destination(dest),
+                funcs,
+                labels,
+                op,
+                pos,
+                op_type,
+            },
+            Instruction::Effect {
+                args,
+                funcs,
+                labels,
+                op,
+                pos,
+            } if !matches!(op, EffectOps::Set) => Instruction::Effect {
+                args: local_renamer
+                    .rewrite_arguments(dominating_definitions_stacks, args),
+                funcs,
+                labels,
+                op,
+                pos,
+            },
+            other => other,
+        };
+    }
 
-    //let mut local_rename_map = HashMap::new();
-    //let local_rename = |map: &mut HashMap<String, usize>,
-    //                    i: usize,
-    //                    last: &HashMap<String, usize>,
-    //                    variable: String|
-    // -> String {
-    //    if let Some(last_idx) = last.get(&variable).copied() {
-    //        if i == last_idx {
-    //            return format!("{variable}.{block_idx_number}.last");
-    //        }
-    //    }
-    //    let current_value = map.entry(variable.clone()).or_insert(0);
-    //    *current_value += 1;
-    //    format!("{variable}.{block_idx_number}.{current_value}")
-    //};
-    //let rename_arguments = |map: &HashMap<String, usize>,
-    //                        mini_stack: &HashMap<
-    //    String,
-    //    Vec<BasicBlockIdx>,
-    //>,
-    //                        i: usize,
-    //                        last: &HashMap<String, usize>,
-    //                        args: Vec<String>|
-    // -> Vec<String> {
-    //    args.into_iter()
-    //        .map(|arg| {
-    //            if let Some(last_idx) = last.get(&arg).copied() {
-    //                if i > last_idx {
-    //                    return format!("{arg}.{block_idx_number}.last");
-    //                }
-    //            }
-    //
-    //            if let Some(local_id) = map.get(&arg).copied() {
-    //                format!("{arg}.{block_idx_number}.{local_id}")
-    //            } else if let Some(dom_idx) =
-    //                mini_stack.get(&arg).and_then(|stack|
-    // stack.last()).copied()            {
-    //                format!(
-    //                    "{arg}.{}.last",
-    //                    dom_idx.as_index_for_slotmap_version_1_0_7_only()
-    //                )
-    //            } else {
-    //                // it must be a function arg?
-    //                arg
-    //            }
-    //        })
-    //        .collect()
-    //};
-    //
-    //let mut last_assignment = HashMap::new();
-    //
-    //for (i, instruction) in
-    //    cfg.vertices[block_idx].instructions.iter().enumerate()
-    //{
-    //    if let Instruction::Constant { dest, .. }
-    //    | Instruction::Value { dest, .. } = &instruction
-    //    {
-    //        last_assignment.insert(dest.clone(), i);
-    //    }
-    //}
-    //
-    //for (name, _) in last_assignment.clone() {
-    //    mini_stack.entry(name).or_default().push(block_idx);
-    //}
-    //
-    //for (i, instruction) in
-    //    cfg.vertices[block_idx].instructions.iter_mut().enumerate()
-    //{
-    //    *instruction = match instruction.clone() {
-    //        Instruction::Constant {
-    //            dest,
-    //            op,
-    //            pos,
-    //            const_type,
-    //            value,
-    //        } => Instruction::Constant {
-    //            dest: local_rename(
-    //                &mut local_rename_map,
-    //                i,
-    //                &last_assignment,
-    //                dest,
-    //            ),
-    //            op,
-    //            pos,
-    //            const_type,
-    //            value,
-    //        },
-    //        Instruction::Value {
-    //            args,
-    //            dest,
-    //            funcs,
-    //            labels,
-    //            op,
-    //            pos,
-    //            op_type,
-    //        } => {
-    //            let new_args = rename_arguments(
-    //                &local_rename_map,
-    //                mini_stack,
-    //                i,
-    //                &last_assignment,
-    //                args,
-    //            );
-    //            Instruction::Value {
-    //                args: new_args,
-    //                dest: local_rename(
-    //                    &mut local_rename_map,
-    //                    i,
-    //                    &last_assignment,
-    //                    dest,
-    //                ),
-    //                funcs,
-    //                labels,
-    //                op,
-    //                pos,
-    //                op_type,
-    //            }
-    //        }
-    //        Instruction::Effect {
-    //            args,
-    //            funcs,
-    //            labels,
-    //            op,
-    //            pos,
-    //        } if !matches!(op, EffectOps::Set) => Instruction::Effect {
-    //            args: rename_arguments(
-    //                &local_rename_map,
-    //                mini_stack,
-    //                i,
-    //                &last_assignment,
-    //                args,
-    //            ),
-    //            funcs,
-    //            labels,
-    //            op,
-    //            pos,
-    //        },
-    //        other => other,
-    //    };
-    //}
-    //
-    //let mut undefs = HashSet::new();
-    //
-    //for next_idx in cfg.successors(block_idx) {
-    //    let new_gets = cfg.vertices[next_idx]
-    //        .instructions
-    //        .iter()
-    //        .filter_map(|instruction| match instruction {
-    //            Instruction::Value {
-    //                dest,
-    //                op: ValueOps::Get,
-    //                op_type,
-    //                ..
-    //            } => {
-    //                let original_name = dest
-    //                    .split_once(".")
-    //                    .map(|(name, _)| name.to_string())
-    //                    .unwrap_or(dest.clone());
-    //                let next_idx_index =
-    //                    next_idx.as_index_for_slotmap_version_1_0_7_only();
-    //                let set_from = if last_assignment
-    //                    .contains_key(&original_name)
-    //                {
-    //                    format!("{original_name}.{block_idx_number}.last")
-    //                } else if let Some(dom_idx) = mini_stack
-    //                    .get(&original_name)
-    //                    .and_then(|stack| stack.last())
-    //                    .copied()
-    //                {
-    //                    format!(
-    //                        "{original_name}.{}.last",
-    //                        dom_idx.as_index_for_slotmap_version_1_0_7_only()
-    //                    )
-    //                } else {
-    //                    undefs.insert((original_name.clone(),
-    // op_type.clone()));
-    // format!("{original_name}.{block_idx_number}.undef")                };
-    //                other_undefs.insert((set_from.clone(), op_type.clone()));
-    //                Some(Instruction::Effect {
-    //                    args: vec![
-    //                        format!("{original_name}.{next_idx_index}.1"),
-    //                        set_from,
-    //                    ],
-    //                    funcs: vec![],
-    //                    labels: vec![],
-    //                    op: bril_rs::EffectOps::Set,
-    //                    pos: None,
-    //                })
-    //            }
-    //            _ => None,
-    //        })
-    //        .collect::<Vec<_>>();
-    //    let has_no_trailing_branch =
-    //        matches!(cfg.vertices[block_idx].exit, LabeledExit::Fallthrough);
-    //    let last = if !has_no_trailing_branch {
-    //        cfg.vertices[block_idx].instructions.pop()
-    //    } else {
-    //        None
-    //    };
-    //    cfg.vertices[block_idx]
-    //        .instructions
-    //        .extend(new_gets.into_iter().chain(last.into_iter()));
-    //}
-    //
-    //for undef in undefs {
-    //    cfg.vertices[block_idx].instructions.insert(
-    //        0,
-    //        Instruction::Value {
-    //            args: vec![],
-    //            dest: format!("{}.{block_idx_number}.undef", undef.0),
-    //            funcs: vec![],
-    //            labels: vec![],
-    //            op: ValueOps::Undef,
-    //            pos: None,
-    //            op_type: undef.1,
-    //        },
-    //    );
-    //}
-    //
-    //for imm_idx in &dominance_tree[block_idx] {
-    //    rename(cfg, *imm_idx, dominance_tree, mini_stack, other_undefs);
-    //}
-    //
-    //for name in last_assignment.keys() {
-    //    if let Some(stack) = mini_stack.get_mut(name) {
-    //        stack.pop();
-    //    }
-    //}
+    let mut locally_required_sets = BTreeMap::new();
+    for successor_idx in cfg.successors(block_idx) {
+        let successor = &cfg.vertices[successor_idx];
+
+        #[derive(Debug)]
+        struct Phi<'a>(&'a String, &'a Type);
+
+        for phi_node in
+            successor.instructions.iter().filter_map(|instruction| {
+                if let Instruction::Value {
+                    dest,
+                    op: ValueOps::Get,
+                    op_type,
+                    ..
+                } = instruction
+                {
+                    Some(Phi(dest, op_type))
+                } else {
+                    None
+                }
+            })
+        {
+            // TODO: I really hate this. It shouldn't be dependent on how
+            // variables are named.
+            let original_name = phi_node
+                .0
+                .split_once(".")
+                .map(|(first, _)| first)
+                .unwrap_or(phi_node.0);
+            let phi_name = format!(
+                "{original_name}.{}.1",
+                successor_idx.as_index_for_slotmap_version_1_0_7_only()
+            );
+            locally_required_sets.insert(
+                phi_name,
+                (original_name.to_string(), phi_node.1.to_owned()),
+            );
+        }
+    }
+    let set_insertion_point = cfg.vertices[block_idx].index_before_exit();
+    cfg.vertices[block_idx].instructions.splice(
+        set_insertion_point..set_insertion_point,
+        locally_required_sets.into_iter().map(
+            |(phi_name, (original_name, phi_type))| {
+                let current_name = local_renamer
+                    .rewrite_argument(
+                        dominating_definitions_stacks,
+                        &original_name,
+                    )
+                    .unwrap_or_else(|| {
+                        let undefined_name = format!("{original_name}.undef");
+                        undefined_names
+                            .insert(undefined_name.clone(), phi_type);
+                        undefined_name
+                    });
+                Instruction::Effect {
+                    args: vec![phi_name, current_name],
+                    funcs: vec![],
+                    labels: vec![],
+                    op: EffectOps::Set,
+                    pos: None,
+                }
+            },
+        ),
+    );
+
+    dominating_definitions_stacks.with_new_definitions(
+        local_renamer,
+        |dominating_definitions_stacks| {
+            for imm_idx in &dominance_tree[block_idx] {
+                rename_and_insert_upsilons(
+                    cfg,
+                    *imm_idx,
+                    dominance_tree,
+                    dominating_definitions_stacks,
+                    undefined_names,
+                );
+            }
+        },
+    )
 }
 
-pub fn dumb_postprocess(
+pub fn insert_undefined_names_at_entry(
     cfg: &mut FunctionCfg,
-    mut potential_undefs: HashMap<String, Type>,
+    mut undefined_names: BTreeMap<String, Type>,
 ) {
     for block in cfg.vertices.values_mut() {
         for instruction in &block.instructions {
             if let Instruction::Constant { dest, .. }
             | Instruction::Value { dest, .. } = &instruction
             {
-                potential_undefs.remove(dest);
+                undefined_names.remove(dest);
             }
         }
     }
-    for (other, ty) in potential_undefs {
+    for (other, ty) in undefined_names {
         cfg.vertices[cfg.entry].instructions.insert(
             0,
             Instruction::Value {
@@ -431,7 +421,7 @@ pub fn from_ssa(cfg: &mut FunctionCfg) -> Result<(), Whatever> {
                 },
             )
         });
-        for instruction in block.instructions.iter_mut() {
+        for instruction in &mut block.instructions {
             if let Some(replacement) = if let Instruction::Effect {
                 args,
                 op: EffectOps::Set,

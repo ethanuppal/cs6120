@@ -209,6 +209,14 @@ jobs:
       - name: Install Python tools
         run: cd bril/bril-txt ; flit install --symlink
 
+      - name: Install Turnt
+        uses: actions/checkout@v4
+        with:
+          repository: cucapra/turnt
+          path: './turnt'
+      - name: Install Turnt part 2
+        run: cd turnt ; flit install --symlink
+
       - name: Snapshot test SSA
         run: |
           cd lesson6/ssa/bril_to_ssa_copied
@@ -218,8 +226,12 @@ jobs:
       - name: Test SSA
         run: |
           cd lesson6/ssa/
-          # python3 ../../lesson4/dataflow/match_outputs.py \
-          #   "brili" \
-          #   cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili" \
-          #   ../../bril/examples/test/to_ssa/*.bril
+          # no function arguments
+          python3 ../../lesson4/dataflow/match_outputs.py \
+            "brili" \
+            cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili" \
+            ../../bril/examples/test/to_ssa/*.bril
+            --exclude if.bril \
+            --exclude argwrite.bril \
+            --exclude loop-branch.bril
 
