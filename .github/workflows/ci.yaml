@@ -248,7 +248,7 @@ jobs:
         run: |
           cd lesson6/ssa/
           python3 ../../lesson4/dataflow/match_outputs.py \
-            "brili" \
-            "cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili" \
+            "brili {args}" \
+            "cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili {args}" \
             ../../bril/examples/test/to_ssa/*.bril \
             ../../bril/benchmarks/core/*.bril
