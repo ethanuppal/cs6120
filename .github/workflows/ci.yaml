@@ -198,6 +198,9 @@ jobs:
       - name: Clone Bril
         run: rm -rf bril && git clone https://github.com/sampsyo/bril && cd bril && git reset --hard bc60765c822852ab574fe8238d33dbe064a94943
 
+      - name: Sanity check
+        run: cargo build --package ssa
+
       - uses: actions/setup-python@v4
         with:
             python-version: '3.11'
