@@ -16,6 +16,7 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
 
       - name: Clone Bril
@@ -49,10 +50,11 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
 
       - name: Clone Bril
-        run: rm -rf bril && git clone https://github.com/sampsyo/bril
+        run: rm -rf bril && git clone https://github.com/sampsyo/bril && cd bril && git reset --hard 94764e92585c7133d08ac14cf3c563d1d272434a
 
       - uses: denoland/setup-deno@v1
         with:
@@ -97,6 +99,7 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
 
       - name: Clone Bril
@@ -143,6 +146,7 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
 
       - name: Install jq
@@ -193,10 +197,14 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
 
       - name: Clone Bril
         run: rm -rf bril && git clone https://github.com/sampsyo/bril && cd bril && git reset --hard bc60765c822852ab574fe8238d33dbe064a94943
+
+      - name: Sanity check
+        run: cargo build --package ssa
 
       - uses: actions/setup-python@v4
         with:
@@ -209,6 +217,14 @@ jobs:
       - name: Install Python tools
         run: cd bril/bril-txt ; flit install --symlink
 
+      - name: Install Turnt
+        uses: actions/checkout@v4
+        with:
+          repository: cucapra/turnt
+          path: './turnt'
+      - name: Install Turnt part 2
+        run: cd turnt ; flit install --symlink
+
       - name: Snapshot test SSA
         run: |
           cd lesson6/ssa/bril_to_ssa_copied
@@ -218,8 +234,12 @@ jobs:
       - name: Test SSA
         run: |
           cd lesson6/ssa/
-          # python3 ../../lesson4/dataflow/match_outputs.py \
-          #   "brili" \
-          #   cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili" \
-          #   ../../bril/examples/test/to_ssa/*.bril
+          # no function arguments
+          python3 ../../lesson4/dataflow/match_outputs.py \
+            "brili" \
+            "cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili" \
+            ../../bril/examples/test/to_ssa/*.bril \
+            --exclude if.bril \
+            --exclude argwrite.bril \
+            --exclude loop-branch.bril
 

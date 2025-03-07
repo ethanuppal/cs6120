@@ -40,6 +40,31 @@ pub struct BasicBlock {
     pub exit: LabeledExit,
 }
 
+impl BasicBlock {
+    //pub fn last_assignments(&self) -> HashMap<String, usize> {
+    //    let mut last_assignments = HashMap::new();
+    //    for (i, instruction) in self.instructions.iter().enumerate() {
+    //        if let Instruction::Constant { dest, .. }
+    //        | Instruction::Value { dest, .. } = &instruction
+    //        {
+    //            last_assignments.insert(dest.clone(), i);
+    //        }
+    //    }
+    //    last_assignments
+    //}
+
+    /// If there is no final jump, branch, or return instruction, the end index
+    /// of the instructions, otherwise, one before that end index.
+    pub fn index_before_exit(&self) -> usize {
+        if matches!(self.exit, LabeledExit::Fallthrough) {
+            self.instructions.len()
+        } else {
+            // there is a final jump, branch, or return instruction
+            self.instructions.len() - 1
+        }
+    }
+}
+
 #[derive(Default)]
 pub enum LabeledExit {
     #[default]

@@ -1,4 +1,4 @@
-import sys, subprocess, json
+import sys, subprocess
 import multiprocessing
 import difflib
 

@@ -52,7 +52,7 @@ fn drop_killed_locals(block: &mut BasicBlock) -> bool {
     let mut dead_instructions = vec![];
 
     for (i, instruction) in block.instructions.iter().enumerate() {
-        let (kill, gen): (Option<&String>, &[String]) = match instruction {
+        let (kill, gen_set): (Option<&String>, &[String]) = match instruction {
             Instruction::Constant { dest, .. } => (Some(dest), &[]),
             Instruction::Value { args, dest, .. } => {
                 (Some(dest), args.as_slice())
@@ -60,7 +60,7 @@ fn drop_killed_locals(block: &mut BasicBlock) -> bool {
             Instruction::Effect { args, .. } => (None, args.as_slice()),
         };
 
-        for usage in gen {
+        for usage in gen_set {
             unused_definitions.remove(usage);
         }
         if let Some(kill) = kill {
