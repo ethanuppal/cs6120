@@ -216,6 +216,8 @@ jobs:
         run: pip install flit
       - name: Install Python tools
         run: cd bril/bril-txt ; flit install --symlink
+      - name: brench
+        run: cd bril/brench ; flit install --symlink
 
       - name: Install Turnt
         uses: actions/checkout@v4
