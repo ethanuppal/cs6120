@@ -71,9 +71,9 @@ jobs:
 
       - name: Install Flit
         run: pip install flit
-      - name: bril-txt
+      - name: Install Python tools
         run: cd bril/bril-txt ; flit install --symlink
-      - name: brench
+      - name: Install brench
         run: cd bril/brench ; flit install --symlink
 
       - name: Test trivial DCE and LVN
@@ -206,6 +206,13 @@ jobs:
       - name: Sanity check
         run: cargo build --package ssa
 
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+     
+      - name: Install brili
+        run: cd bril && deno install --global brili.ts 
+
       - uses: actions/setup-python@v4
         with:
             python-version: '3.11'
@@ -216,7 +223,7 @@ jobs:
         run: pip install flit
       - name: Install Python tools
         run: cd bril/bril-txt ; flit install --symlink
-      - name: brench
+      - name: Install brench
         run: cd bril/brench ; flit install --symlink
 
       - name: Install Turnt
