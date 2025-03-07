@@ -1,6 +1,15 @@
-import sys, subprocess
+import sys, subprocess, re
 import multiprocessing
 import difflib
+
+
+def extract_args(file):
+    with open(file, "r", encoding="utf-8") as f:
+        for line in f:
+            match = re.search(r"# ARGS: (.+)", line)
+            if match:
+                return match.group(1)
+    return None
 
 
 def parse_args():
@@ -49,8 +58,16 @@ def init_worker(shared_failure_event, shared_oracle, shared_tested):
 
 
 def check_file(file):
-    oracle_output = subprocess.getoutput(f"bril2json <{file} | {oracle}")
-    my_output = subprocess.getoutput(f"bril2json <{file} | {tested}")
+    args = extract_args(file)
+    if args == None:
+        args = ""
+
+    oracle_output = subprocess.getoutput(
+        f"bril2json <{file} | {oracle}".replace("{args}", args)
+    )
+    my_output = subprocess.getoutput(
+        f"bril2json <{file} | {tested}".replace("{args}", args)
+    )
     if oracle_output == my_output:
         print(f"\x1b[32m{file} OK\x1b[m")
     else:
