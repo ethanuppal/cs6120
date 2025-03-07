@@ -227,11 +227,13 @@ jobs:
       - name: Install Turnt part 2
         run: cd turnt ; flit install --symlink
 
+
       - name: Snapshot test SSA
         run: |
           cd lesson6/ssa/bril_to_ssa_copied
           turnt *.bril --diff
           turnt *.bril --diff
+          cargo build --package tdce --bin tdce
           brench brench.toml *.bril | python3 check_brench.py --allow-slower
 
       - name: Test SSA
