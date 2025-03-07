@@ -88,12 +88,12 @@ fn main() -> Result<(), Whatever> {
                         &mut cfg,
                         undefined_names,
                     );
-                }
 
-                assert!(
-                    ssa::is_ssa(&cfg),
-                    "Result of SSA transformation was not SSA"
-                );
+                    assert!(
+                        ssa::is_ssa(&cfg),
+                        "Result of SSA transformation was not SSA"
+                    );
+                }
 
                 print::print_cfg_as_bril_text(cfg);
             }

@@ -1,4 +1,5 @@
 @main(cond: bool) {
+.__SSA_ENTRY:
 .entry:
   a: int = const 47;
   br cond .left .right;
