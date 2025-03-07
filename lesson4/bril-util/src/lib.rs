@@ -11,7 +11,7 @@ pub enum InstructionValue {
 pub trait InstructionExt {
     fn kill(&self) -> Option<&String>;
 
-    fn gen(&self) -> &[String];
+    fn gen_set(&self) -> &[String];
 
     fn value(&self) -> Option<InstructionValue>;
 }
@@ -25,7 +25,7 @@ impl InstructionExt for Instruction {
         }
     }
 
-    fn gen(&self) -> &[String] {
+    fn gen_set(&self) -> &[String] {
         match self {
             Instruction::Value { args, .. }
             | Instruction::Effect { args, .. } => args,

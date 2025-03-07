@@ -18,7 +18,7 @@ fn transfer(
     for instruction in &block.instructions {
         gen_set.extend(
             instruction
-                .gen()
+                .gen_set()
                 .iter()
                 .filter(|variable| !kill_set.contains(variable))
                 .map(|variable| Variable(variable.to_string())),
