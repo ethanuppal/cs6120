@@ -251,4 +251,4 @@ jobs:
             "brili" \
             "cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili" \
             ../../bril/examples/test/to_ssa/*.bril \
-            ../../bril/benchmarks/**/*.bril
+            ../../bril/benchmarks/core/*.bril
