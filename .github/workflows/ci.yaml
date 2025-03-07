@@ -193,6 +193,7 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.83
       - uses: Swatinem/rust-cache@v2
 
       - name: Clone Bril
