@@ -16,7 +16,7 @@ edition = "2021"
 license-file = "LICENSE"
 
 [workspace.dependencies]
-bril-rs = { git = "https://github.com/sampsyo/bril", features = [
+bril-rs = { path = "bril/bril-rs", features = [
   "memory",
   "float",
   "ssa",
@@ -24,7 +24,7 @@ bril-rs = { git = "https://github.com/sampsyo/bril", features = [
   "position",
   "import",
   "char",
-], rev = "bc60765c822852ab574fe8238d33dbe064a94943" }
+] }
 slotmap = "1.0.7"
 snafu = "0.8.5"
 argh = "0.1.13"

@@ -37,8 +37,8 @@ dependencies = [
 [[package]]
 name = "bril-rs"
 version = "0.1.0"
-source = "git+https://github.com/sampsyo/bril?rev=bc60765c822852ab574fe8238d33dbe064a94943#bc60765c822852ab574fe8238d33dbe064a94943"
 dependencies = [
+ "bril-rs",
  "serde",
  "serde_json",
  "thiserror",
