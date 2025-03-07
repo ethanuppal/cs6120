@@ -52,7 +52,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Clone Bril
-        run: rm -rf bril && git clone https://github.com/sampsyo/bril
+        run: rm -rf bril && git clone https://github.com/sampsyo/bril && cd bril && git reset --hard 94764e92585c7133d08ac14cf3c563d1d272434a
 
       - uses: denoland/setup-deno@v1
         with:
