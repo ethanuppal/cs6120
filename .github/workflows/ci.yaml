@@ -237,8 +237,8 @@ jobs:
           # no function arguments
           python3 ../../lesson4/dataflow/match_outputs.py \
             "brili" \
-            cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili" \
-            ../../bril/examples/test/to_ssa/*.bril
+            "cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili" \
+            ../../bril/examples/test/to_ssa/*.bril \
             --exclude if.bril \
             --exclude argwrite.bril \
             --exclude loop-branch.bril
