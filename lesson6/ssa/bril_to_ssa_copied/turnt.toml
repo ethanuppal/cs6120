@@ -1,0 +1,3 @@
+[envs.phi_insertion]
+command = "bril2json < {filename} | cargo run --bin ssa --quiet -- --into-ssa"
+output.phi_insertion = "-"

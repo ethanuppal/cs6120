@@ -26,6 +26,10 @@ impl BasicBlockIdx {
         // hacky, but it doesn't really matter here
         self.data().as_ffi()
     }
+
+    pub fn as_index_for_slotmap_version_1_0_7_only(&self) -> u64 {
+        self.data().as_ffi() & 0xffff_ffff
+    }
 }
 
 #[derive(Default)]

@@ -1,0 +1,16 @@
+@main(a: int) {
+.while.cond:
+  a: int = get;
+  is_term: bool = get;
+  one: int = get;
+  zero: int = get;
+  zero: int = const 0;
+  is_term: bool = eq a zero;
+  br is_term .while.finish .while.body;
+.while.body:
+  one: int = const 1;
+  a: int = sub a one;
+  jmp .while.cond;
+.while.finish:
+  print a;
+}

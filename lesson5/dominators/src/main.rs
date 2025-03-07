@@ -72,7 +72,7 @@ fn main() -> Result<(), Whatever> {
                 print_block_info_sorted(&cfg, dominators);
             }
             Algorithm::DominatorTree => {
-                let tree = compute_dominator_tree(dominators);
+                let tree = compute_dominator_tree(&dominators);
                 print_block_info_sorted(&cfg, tree);
             }
             Algorithm::DominationFrontier => {

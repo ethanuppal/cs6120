@@ -187,3 +187,39 @@ jobs:
            --exclude core/recfact.bril \
            --exclude float/euler.bril \
            --exclude float/mandelbrot.bril
+
+
+  lesson6:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clone Bril
+        run: rm -rf bril && git clone https://github.com/sampsyo/bril && cd bril && git reset --hard bc60765c822852ab574fe8238d33dbe064a94943
+
+      - uses: actions/setup-python@v4
+        with:
+            python-version: '3.11'
+            cache: pip
+            cache-dependency-path: /bril/bril-txt/pyproject.toml
+
+      - name: Install Flit
+        run: pip install flit
+      - name: Install Python tools
+        run: cd bril/bril-txt ; flit install --symlink
+
+      - name: Snapshot test SSA
+        run: |
+          cd lesson6/ssa/bril_to_ssa_copied
+          turnt *.bril --diff
+          turnt *.bril --diff
+
+      - name: Test SSA
+        run: |
+          cd lesson6/ssa/
+          # python3 ../../lesson4/dataflow/match_outputs.py \
+          #   "brili" \
+          #   cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili" \
+          #   ../../bril/examples/test/to_ssa/*.bril
+

@@ -2,7 +2,12 @@ use std::{fs, io, path::PathBuf};
 
 use argh::FromArgs;
 use bril_rs::Program;
-use snafu::{ResultExt, Whatever};
+use build_cfg::print;
+use dominators::{
+    compute_dominance_frontiers, compute_dominator_tree, compute_dominators,
+};
+use snafu::{whatever, ResultExt, Whatever};
+use ssa::DominatingDefinitionsStacks;
 
 /// Transforms Bril into and out of SSA
 #[derive(FromArgs)]
@@ -39,8 +44,52 @@ fn main() -> Result<(), Whatever> {
     };
 
     for function in program.functions {
-        let cfg = build_cfg::build_cfg(&function, true)
-            .whatever_context("Failed to build cfg")?;
+        match (opts.into_ssa, opts.from_ssa) {
+            (true, false) => {
+                let mut cfg = build_cfg::build_cfg(&function, true)
+                    .whatever_context("Failed to build cfg")?;
+
+                let dominators = compute_dominators(&cfg);
+                let dominance_tree = compute_dominator_tree(&dominators);
+                let dominance_frontiers =
+                    compute_dominance_frontiers(&cfg, dominators);
+
+                // 1: Insert phi nodes
+
+                let definition_sites = ssa::compute_definition_sites(&cfg);
+                let phi_insertion_points = ssa::determine_phi_insertion_points(
+                    definition_sites,
+                    dominance_frontiers,
+                );
+                ssa::insert_phis(&mut cfg, phi_insertion_points);
+
+                // 2: Rename variables and insert upsilon nodes
+
+                let entry = cfg.entry;
+                let mut dominating_definitiions_stacks =
+                    ssa::DominatingDefinitionsStacks::default();
+                ssa::rename_and_insert_upsilons(
+                    &mut cfg,
+                    entry,
+                    &dominance_tree,
+                    &mut dominating_definitiions_stacks,
+                );
+                //
+                //dumb_postprocess(&mut cfg,
+                // potential_undefs.into_iter().collect());
+
+                print::print_cfg_as_bril_text(cfg);
+            }
+            (false, true) => {
+                let mut cfg = build_cfg::build_cfg(&function, true)
+                    .whatever_context("Failed to build cfg")?;
+
+                ssa::from_ssa(&mut cfg)?;
+
+                print::print_cfg_as_bril_text(cfg);
+            }
+            _ => whatever!("Pass only one of --into-ssa or --from-ssa"),
+        }
     }
 
     Ok(())

@@ -6,7 +6,7 @@ use dataflow::construct_postorder;
 pub fn compute_dominators(
     cfg: &FunctionCfg,
 ) -> SecondaryMap<BasicBlockIdx, HashSet<BasicBlockIdx>> {
-    let mut reverse_postorder = construct_postorder(&cfg);
+    let mut reverse_postorder = construct_postorder(cfg);
     reverse_postorder.reverse();
     reverse_postorder.retain(|idx| *idx != cfg.entry);
 
@@ -47,13 +47,13 @@ pub fn compute_dominators(
 }
 
 pub fn compute_dominator_tree(
-    dominators: SecondaryMap<BasicBlockIdx, HashSet<BasicBlockIdx>>,
+    dominators: &SecondaryMap<BasicBlockIdx, HashSet<BasicBlockIdx>>,
 ) -> SecondaryMap<BasicBlockIdx, HashSet<BasicBlockIdx>> {
     let mut rev = SecondaryMap::<_, HashSet<_>>::new();
-    for (idx, edge) in dominators {
+    for (idx, edge) in dominators.iter() {
         for dest_idx in edge {
-            let entry = rev.entry(dest_idx).unwrap().or_default();
-            if idx != dest_idx {
+            let entry = rev.entry(*dest_idx).unwrap().or_default();
+            if idx != *dest_idx {
                 entry.insert(idx);
             }
         }
