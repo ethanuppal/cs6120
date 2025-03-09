@@ -246,9 +246,7 @@ jobs:
 
       - name: Test SSA
         run: |
-          cd lesson6/ssa/
-          python3 ../../lesson4/dataflow/match_outputs.py \
-            "brili" \
-            "cargo run --bin ssa --quiet -- --into-ssa | bril2json | brili" \
-            ../../bril/examples/test/to_ssa/*.bril \
-            ../../bril/benchmarks/core/*.bril
+          cargo build --package tdce --bin tdce
+          cargo build --package ssa --bin ssa
+          cd lesson6/ssa/bril_to_ssa_copied
+          brench brench.toml ../../../bril/benchmarks/core/*.bril | python3 check_brench.py --allow-slower

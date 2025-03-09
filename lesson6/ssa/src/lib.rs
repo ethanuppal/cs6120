@@ -30,7 +30,9 @@ pub fn insert_new_empty_entry_block(cfg: &mut FunctionCfg) {
     cfg.entry = new_entry;
 }
 
-pub struct DefinitionSites(pub BTreeMap<String, (Type, Vec<BasicBlockIdx>)>);
+pub struct DefinitionSites(
+    pub BTreeMap<String, (Type, BTreeSet<BasicBlockIdx>)>,
+);
 
 /// The basic blocks a given variable was assigned in along with its type.
 pub fn compute_definition_sites(cfg: &FunctionCfg) -> DefinitionSites {
@@ -58,9 +60,9 @@ pub fn compute_definition_sites(cfg: &FunctionCfg) -> DefinitionSites {
                 for (definition, ty, block_idx) in some_definitions {
                     definitions
                         .entry(definition)
-                        .or_insert_with(|| (ty, Vec::default()))
+                        .or_insert_with(|| (ty, BTreeSet::default()))
                         .1
-                        .push(block_idx);
+                        .insert(block_idx);
                 }
                 definitions
             }),
@@ -77,10 +79,16 @@ pub fn determine_phi_insertion_points(
     definition_sites: DefinitionSites,
     dominance_frontiers: SecondaryMap<BasicBlockIdx, HashSet<BasicBlockIdx>>,
 ) -> PhiInsertionPoints {
+    let dominance_frontiers: SecondaryMap<_, BTreeSet<_>> = dominance_frontiers
+        .into_iter()
+        .map(|(idx, set)| (idx, set.into_iter().collect()))
+        .collect();
+
     let mut insertion_points = BTreeMap::new();
 
     for (variable, (ty, mut definition_blocks)) in definition_sites.0 {
-        while let Some(block_idx) = definition_blocks.pop() {
+        let mut current_definition_blocks = definition_blocks.clone();
+        while let Some(block_idx) = current_definition_blocks.pop_first() {
             for frontier_idx in &dominance_frontiers[block_idx] {
                 let ty = ty.clone();
                 insertion_points
@@ -90,6 +98,11 @@ pub fn determine_phi_insertion_points(
                     })
                     .1
                     .insert(*frontier_idx);
+
+                if !definition_blocks.contains(frontier_idx) {
+                    current_definition_blocks.insert(*frontier_idx);
+                    definition_blocks.insert(*frontier_idx);
+                }
             }
         }
     }
