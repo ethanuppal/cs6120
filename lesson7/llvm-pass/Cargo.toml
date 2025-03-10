@@ -1,0 +1,11 @@
+[package]
+name = "llvm-pass"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+llvm-plugin.workspace = true

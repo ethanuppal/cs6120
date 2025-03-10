@@ -11,6 +11,7 @@
 #       //      y  = y * ( 1.5 - ( x2 * y * y ) );   // 2nd iteration, this can be removed
 #       return y;
 #   }
+#   Don't @ me about code style; I took the above code verbatim
 
 @main(y: float) {
   one_half: float = const 0.5;

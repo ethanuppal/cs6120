@@ -1,0 +1,17 @@
+set shell := ["/bin/bash", "-c"]
+set export
+
+LLVM_SYS_180_PREFIX := `brew --prefix llvm@18`
+PATH := LLVM_SYS_180_PREFIX / "bin:" + `echo $PATH`
+target_dir := "../target"
+
+setup_and_verify_llvm:
+    clang --version
+    opt --version
+
+build_pass: setup_and_verify_llvm
+    cargo build --package llvm-pass || (cargo clean && cargo build --package llvm-pass)
+
+run_pass file: build_pass
+    clang -S -emit-llvm {{file}} -o out.ll
+    opt --load-pass-plugin={{target_dir}}/debug/libllvm_pass.dylib --passes=custom-pass -disable-output out.ll

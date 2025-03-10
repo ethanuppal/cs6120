@@ -250,3 +250,21 @@ jobs:
           cargo build --package ssa --bin ssa
           cd lesson6/ssa/bril_to_ssa_copied
           brench brench.toml ../../../bril/benchmarks/core/*.bril | python3 check_brench.py --allow-slower
+  
+  lesson7:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clone Bril
+        run: rm -rf bril && git clone https://github.com/sampsyo/bril && cd bril && git reset --hard bc60765c822852ab574fe8238d33dbe064a94943
+
+      - name: Install Just and LLVM
+        run: brew install just llvm@18
+
+      - name: Run the LLVM pass
+        run: |
+          cd lesson7
+          just run_pass test.c
