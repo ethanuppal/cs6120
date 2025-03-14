@@ -270,3 +270,4 @@ jobs:
           just setup_and_verify_llvm
           just run_pass_and_code test_add.c
           just run_pass_and_code test_fib.c
+          just run_pass_and_code test_sum.c

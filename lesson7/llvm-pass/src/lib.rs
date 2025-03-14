@@ -641,8 +641,11 @@ impl AutoMemoizePass {
             old_entry_block,
         );
 
-        let flattened_array_length: u32 =
-            bounds.cached_ranges.values().map(|range| range.end).sum();
+        let flattened_array_length: u32 = bounds
+            .cached_ranges
+            .values()
+            .map(|range| range.end)
+            .product();
 
         let MemoizationGlobals {
             value_array_type,
