@@ -14,4 +14,8 @@ build_pass: setup_and_verify_llvm
 
 run_pass file: build_pass
     clang -S -emit-llvm {{file}} -o out.ll
-    opt --load-pass-plugin={{target_dir}}/debug/libllvm_pass.dylib --passes=custom-pass -disable-output out.ll
+    opt --load-pass-plugin={{target_dir}}/debug/libllvm_pass.dylib --passes=auto-memoize:verbose out.ll -f | llvm-dis > out.new.ll
+
+run_pass_and_code file: (run_pass file)
+    clang out.new.ll
+    ./a.out

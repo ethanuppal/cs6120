@@ -33,3 +33,4 @@ serde_json = "1.0.137"
 owo-colors = "4.1.0"
 inform = { version = "0.3.4", features = ["io"] }
 llvm-plugin = { version = "0.6.0", features = ["llvm18-0"] }
+either = "1.5" # for inkwell: https://github.com/TheDan64/inkwell/issues/580

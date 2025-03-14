@@ -9,3 +9,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 llvm-plugin.workspace = true
+either.workspace = true
+slotmap.workspace = true
