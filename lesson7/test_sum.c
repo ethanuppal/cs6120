@@ -4,16 +4,12 @@
 
 #define N 30
 
-int fib(int a) {
-    __builtin_assume(a >= 0);
-    __builtin_assume(a < N);
-    if (a == 0) {
-        return 0;
-    } else if (a == 1) {
-        return 1;
-    } else {
-        return fib(a - 1) + fib(a - 2);
-    }
+int sum(int x, int y) {
+    __builtin_assume(x >= 0);
+    __builtin_assume(x < N);
+    __builtin_assume(y >= 0);
+    __builtin_assume(y < N);
+    return x + y;
 }
 
 int main(int argc, char** argv) {
@@ -27,14 +23,16 @@ int main(int argc, char** argv) {
         perror("gettimeofday");
         return 1;
     }
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            int result = fib(j);
-            if (j >= 2 && result != data[i * N + j - 1] + data[i * N + j - 2]) {
-                fprintf(stderr, "BRUH.... you got %dth fib was %d\n", j, result);
-                exit(1);
+    for (int k = 0; k < N; k++) {
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                int result = sum(i, j);
+                if (result != i + j) {
+                    fprintf(stderr, "BRUH.... %d + %d = %d\n", i, j, result);
+                    exit(1);
+                }
+                data[i * N + j] = result;
             }
-            data[i * N + j] = result;
         }
     }
     struct timeval end;
@@ -47,12 +45,6 @@ int main(int argc, char** argv) {
     double end_seconds = (double)end.tv_sec + (double)end.tv_usec / 1e6;
 
     printf("%f\n", end_seconds - start_seconds);
-
-    /*for (int i = 0; i < N; i++) {*/
-    /*    for (int j = 0; j < N; j++) {*/
-    /*        printf("%d\r", data[i * N + j]);*/
-    /*    }*/
-    /*}*/
 
     free(data);
 }

@@ -173,7 +173,7 @@ enum AssumedInequality<'a> {
 // style, I'm making other helper functions take `&self` even though I'd prefer
 // them to be plain functions.
 impl AutoMemoizePass {
-    const TYPICAL_PAGE_SIZE: u32 = 8;
+    const TYPICAL_PAGE_SIZE: u32 = 4096;
 
     fn construct_memoization_bounds<'a>(
         &self,
