@@ -3,5 +3,5 @@ target/
 lesson3/stats.csv
 lesson7/*.ll
 *.dSYM
-*a.out
-*a.out2
+**/a.out
+**/a.out2

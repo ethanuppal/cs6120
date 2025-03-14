@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#define N 1000
+#define N 10000
 
 int add1(int a) {
     __builtin_assume(a >= 0);
@@ -41,12 +41,6 @@ int main(int argc, char** argv) {
     double end_seconds = (double)end.tv_sec + (double)end.tv_usec / 1e6;
 
     printf("%f\n", end_seconds - start_seconds);
-
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++) {
-            printf("%d\r", data[i * N + j]);
-        }
-    }
 
     free(data);
 }

@@ -267,4 +267,6 @@ jobs:
       - name: Run the LLVM pass
         run: |
           cd lesson7
-          just run_pass test.c
+          just setup_and_verify_llvm
+          just run_pass_and_code test_add.c
+          just run_pass_and_code test_fib.c

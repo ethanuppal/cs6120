@@ -9,13 +9,20 @@ setup_and_verify_llvm:
     clang --version
     opt --version
 
-build_pass: setup_and_verify_llvm
-    cargo build --package llvm-pass || (cargo clean && cargo build --package llvm-pass)
+build_pass args:
+    @cargo build {{args}} --package llvm-pass || (cargo clean {{args}} && cargo build {{args}} --package llvm-pass)
 
-run_pass file: build_pass
+run_pass file: setup_and_verify_llvm (build_pass "")
     clang -S -emit-llvm {{file}} -o out.ll
     opt --load-pass-plugin={{target_dir}}/debug/libllvm_pass.dylib --passes=auto-memoize:verbose out.ll -f | llvm-dis > out.new.ll
 
-run_pass_and_code file: (run_pass file)
-    clang out.new.ll
-    ./a.out
+run_pass_and_code file: (build_pass "-q 2>/dev/null")
+    @printf "passes,seconds\n"
+    @clang {{file}} -o a.out
+    @printf "none,"
+    @./a.out
+    @clang -S -emit-llvm {{file}} -o out.ll
+    @opt --load-pass-plugin={{target_dir}}/debug/libllvm_pass.dylib --passes=auto-memoize out.ll -f | llvm-dis > out.new.ll
+    @clang out.new.ll -o a.out2
+    @printf "auto-memoize,"
+    @./a.out2
