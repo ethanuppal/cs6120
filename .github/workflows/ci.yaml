@@ -54,7 +54,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Clone Bril
-        run: rm -rf bril && git clone https://github.com/sampsyo/bril && cd bril && git reset --hard 94764e92585c7133d08ac14cf3c563d1d272434a
+        run: rm -rf bril && git clone https://github.com/sampsyo/bril && cd bril && git reset --hard bc60765c822852ab574fe8238d33dbe064a94943
 
       - uses: denoland/setup-deno@v1
         with:
@@ -92,6 +92,8 @@ jobs:
 
           cat ../bril/examples/test/tdce/reassign-dkp.bril | tail -n +2 > ../bril/examples/test/tdce/reassign-dkp.bril.temp
           cat ../bril/examples/test/tdce/reassign-dkp.bril.temp > ../bril/examples/test/tdce/reassign-dkp.bril
+
+          rm -rf ../bril/benchmarks/mixed/brilirs-only
 
           brench brench.toml ../bril/benchmarks/**/*.bril ../bril/examples/test/tdce/*.bril | grep connected-components --invert-match | python3 check_brench.py
 
@@ -240,6 +242,7 @@ jobs:
           cd lesson6/ssa/bril_to_ssa_copied
           turnt *.bril --diff
           turnt *.bril --diff
+          cargo build --package lvn --bin lvn
           cargo build --package tdce --bin tdce
           cargo build --package ssa --bin ssa
           brench brench.toml *.bril | python3 check_brench_into_ssa.py --allow-slower
@@ -254,10 +257,11 @@ jobs:
 
       - name: Test SSA
         run: |
+          cargo build --package lvn --bin lvn
           cargo build --package tdce --bin tdce
           cargo build --package ssa --bin ssa
           cd lesson6/ssa/bril_to_ssa_copied
-          brench brench.toml ../../../bril/benchmarks/core/*.bril | python3 ../check_brench.py --allow-slower
+          brench brench.toml ../../../bril/benchmarks/*/*.bril | python3 check_brench_into_ssa.py --allow-slower
   
   lesson7:
     runs-on: macos-15

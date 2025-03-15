@@ -124,6 +124,21 @@ pub fn lvn(block: &mut BasicBlock) {
 
     for (i, instruction) in block.instructions.iter_mut().enumerate() {
         *instruction = match &instruction {
+            Instruction::Value {
+                dest,
+                op: ValueOps::Get,
+                pos,
+                op_type,
+                ..
+            } => Instruction::Value {
+                args: vec![],
+                dest: dest.clone(),
+                funcs: vec![],
+                labels: vec![],
+                op: ValueOps::Get,
+                pos: pos.clone(),
+                op_type: op_type.clone(),
+            },
             Instruction::Constant {
                 dest,
                 pos,
