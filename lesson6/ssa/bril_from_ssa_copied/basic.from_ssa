@@ -1,0 +1,6 @@
+@main() {
+  y: int = const 42;
+  shadow.x0: int = id y;
+  x: int = id shadow.x0;
+  print x;
+}

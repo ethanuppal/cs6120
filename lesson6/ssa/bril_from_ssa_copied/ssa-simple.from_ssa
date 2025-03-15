@@ -1,0 +1,12 @@
+@main(cond: bool) {
+.top:
+  a: int = const 5;
+  shadow.c0: int = id a;
+  br cond .here .there;
+.here:
+  b: int = const 7;
+  shadow.c0: int = id b;
+.there:
+  c: int = id shadow.c0;
+  print c;
+}

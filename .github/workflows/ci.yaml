@@ -235,21 +235,29 @@ jobs:
         run: cd turnt ; flit install --symlink
 
 
-      - name: Snapshot test SSA
+      - name: Snapshot test into-SSA
         run: |
           cd lesson6/ssa/bril_to_ssa_copied
           turnt *.bril --diff
           turnt *.bril --diff
           cargo build --package tdce --bin tdce
           cargo build --package ssa --bin ssa
-          brench brench.toml *.bril | python3 check_brench.py --allow-slower
+          brench brench.toml *.bril | python3 check_brench_into_ssa.py --allow-slower
+
+      - name: Snapshot test from-SSA
+        run: |
+          cd lesson6/ssa/bril_from_ssa_copied
+          turnt *.bril --diff
+          turnt *.bril --diff
+          cargo build --package ssa --bin ssa
+          brench brench.toml *.bril | python3 check_brench_from_ssa.py --allow-slower
 
       - name: Test SSA
         run: |
           cargo build --package tdce --bin tdce
           cargo build --package ssa --bin ssa
           cd lesson6/ssa/bril_to_ssa_copied
-          brench brench.toml ../../../bril/benchmarks/core/*.bril | python3 check_brench.py --allow-slower
+          brench brench.toml ../../../bril/benchmarks/core/*.bril | python3 ../check_brench.py --allow-slower
   
   lesson7:
     runs-on: macos-15

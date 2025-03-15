@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use bril_rs::{EffectOps, Instruction, Type, ValueOps};
+use bril_util::InstructionExt;
 use build_cfg::{
     slotmap::SecondaryMap, BasicBlock, BasicBlockIdx, Exit, FunctionCfg, Label,
     LabeledExit,
@@ -479,6 +480,32 @@ pub fn is_ssa(cfg: &FunctionCfg) -> bool {
     true
 }
 
+struct FunctionNameGenerator {
+    names: HashMap<String, usize>,
+}
+
+impl FunctionNameGenerator {
+    fn from(cfg: &FunctionCfg) -> Self {
+        let mut names = HashMap::new();
+        for block in cfg.vertices.values() {
+            for instruction in &block.instructions {
+                if let Some(kill) = instruction.kill() {
+                    *names.entry(kill.clone()).or_default() += 1;
+                }
+            }
+        }
+        Self { names }
+    }
+
+    fn new_prefixed(&mut self, prefix: impl Into<String>) -> String {
+        let prefix = prefix.into();
+        let suffix = self.names.entry(prefix.clone()).or_default();
+        let full = format!("{prefix}{suffix}");
+        *suffix += 1;
+        full
+    }
+}
+
 pub fn from_ssa(cfg: &mut FunctionCfg) -> Result<(), Whatever> {
     if !is_ssa(cfg) {
         whatever!("Input was not in SSA already");
@@ -499,16 +526,47 @@ pub fn from_ssa(cfg: &mut FunctionCfg) -> Result<(), Whatever> {
         }
     }
 
+    let mut name_generator = FunctionNameGenerator::from(cfg);
+    let mut shadow_env = HashMap::new();
+
     for block in cfg.vertices.values_mut() {
-        block.instructions.retain(|instruction| {
-            !matches!(
-                instruction,
-                Instruction::Value {
-                    op: ValueOps::Get,
-                    ..
-                },
-            )
-        });
+        //block.instructions.retain(|instruction| {
+        //    !matches!(
+        //        instruction,
+        //        Instruction::Value {
+        //            op: ValueOps::Get,
+        //            ..
+        //        },
+        //    )
+        //});
+        for instruction in &mut block.instructions {
+            if let Some(replacement) = if let Instruction::Value {
+                dest,
+                op: ValueOps::Get,
+                op_type,
+                ..
+            } = instruction
+            {
+                let shadow_variable =
+                    name_generator.new_prefixed(format!("shadow.{}", dest));
+                shadow_env.insert(dest.clone(), shadow_variable.clone());
+                Some(Instruction::Value {
+                    args: vec![shadow_variable],
+                    dest: dest.clone(),
+                    funcs: vec![],
+                    labels: vec![],
+                    op: ValueOps::Id,
+                    pos: None,
+                    op_type: op_type.clone(),
+                })
+            } else {
+                None
+            } {
+                *instruction = replacement;
+            }
+        }
+    }
+    for block in cfg.vertices.values_mut() {
         for instruction in &mut block.instructions {
             if let Some(replacement) = if let Instruction::Effect {
                 args,
@@ -521,14 +579,14 @@ pub fn from_ssa(cfg: &mut FunctionCfg) -> Result<(), Whatever> {
                     "EffectOps::Set should have two arguments"
                 );
                 Some(Instruction::Value {
-                    args: vec![args[1].clone()],
-                    dest: args[0].clone(),
-                    funcs: vec![],
-                    labels: vec![],
-                    op: ValueOps::Id,
-                    pos: None,
-                    op_type: set_operation_types.get(&args[0]).whatever_context("The corresponding `get` instruction does not exist or did not specify a type")?.clone(),
-                })
+                args: vec![args[1].clone()],
+                dest: shadow_env.get(&args[0]).cloned().expect("No corresponding `get` instruction"),
+                funcs: vec![],
+                labels: vec![],
+                op: ValueOps::Id,
+                pos: None,
+                op_type: set_operation_types.get(&args[0]).whatever_context("The corresponding `get` instruction does not exist or did not specify a type")?.clone(),
+            })
             } else {
                 None
             } {
