@@ -3,7 +3,7 @@ use std::collections::{HashSet, VecDeque};
 use bril_util::{InstructionExt, InstructionValue};
 use build_cfg::{BasicBlock, BasicBlockIdx, FunctionCfg};
 
-use crate::{solve_dataflow, Direction};
+use crate::{Direction, solve_dataflow};
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub struct Definition(pub String, pub InstructionValue, pub BasicBlockIdx);

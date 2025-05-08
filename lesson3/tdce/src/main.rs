@@ -7,7 +7,7 @@ use std::{
 use argh::FromArgs;
 use bril_rs::{Instruction, Program};
 use build_cfg::{
-    print::print_cfg_as_bril_text, slotmap::SlotMap, BasicBlock, BasicBlockIdx,
+    BasicBlock, BasicBlockIdx, print::print_cfg_as_bril_text, slotmap::SlotMap,
 };
 use snafu::{ResultExt, Whatever};
 

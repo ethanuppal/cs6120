@@ -1,4 +1,4 @@
-use build_cfg::{slotmap::SecondaryMap, BasicBlockIdx, FunctionCfg};
+use build_cfg::{BasicBlockIdx, FunctionCfg, slotmap::SecondaryMap};
 
 pub fn construct_postorder(cfg: &FunctionCfg) -> Vec<BasicBlockIdx> {
     fn helper(

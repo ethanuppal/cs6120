@@ -7,8 +7,8 @@ use std::{collections::HashMap, mem};
 use bril_rs::{
     Argument, Code, EffectOps, Function, Instruction, Position, Type,
 };
-use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
-use snafu::{whatever, OptionExt, Whatever};
+use slotmap::{Key, SecondaryMap, SlotMap, new_key_type};
+use snafu::{OptionExt, Whatever, whatever};
 
 pub mod print;
 
@@ -111,6 +111,34 @@ pub struct FunctionCfg {
 }
 
 impl FunctionCfg {
+    pub fn remove_edge(
+        &mut self,
+        start_block: BasicBlockIdx,
+        end_block: BasicBlockIdx,
+    ) {
+        self.vertices[start_block].exit = LabeledExit::Return(None);
+        self.edges.remove(start_block);
+        self.rev_edges[end_block]
+            .retain(|predecessor| *predecessor != start_block);
+    }
+
+    pub fn add_unconditional_edge(
+        &mut self,
+        start_block: BasicBlockIdx,
+        end_block: BasicBlockIdx,
+    ) {
+        if let Some(label) = self.vertices[end_block].label.clone() {
+            self.vertices[start_block].exit = LabeledExit::Unconditional {
+                label: label.name,
+                pos: None,
+            }
+        }
+        self.edges[start_block] = Exit::Unconditional(end_block);
+        if !self.rev_edges[end_block].contains(&start_block) {
+            self.rev_edges[end_block].push(start_block);
+        }
+    }
+
     pub fn successors(&self, block: BasicBlockIdx) -> Vec<BasicBlockIdx> {
         match &self.edges[block] {
             Exit::Fallthrough(destination_idx) => {

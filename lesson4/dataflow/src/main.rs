@@ -10,12 +10,12 @@ use std::{
 use argh::FromArgs;
 use bril_rs::Program;
 use build_cfg::{
-    slotmap::SecondaryMap, BasicBlock, BasicBlockIdx, FunctionCfg,
+    BasicBlock, BasicBlockIdx, FunctionCfg, slotmap::SecondaryMap,
 };
 use dataflow::construct_postorder;
 use live_variables::live_variables;
 use reaching_definitions::reaching_definitions;
-use snafu::{whatever, ResultExt, Whatever};
+use snafu::{ResultExt, Whatever, whatever};
 
 pub mod live_variables;
 pub mod reaching_definitions;

@@ -258,6 +258,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "loop-opt"
+version = "0.1.0"
+dependencies = [
+ "argh",
+ "bril-rs",
+ "bril-util",
+ "build-cfg",
+ "dominators",
+ "serde_json",
+ "snafu",
+]
+
+[[package]]
 name = "lvn"
 version = "0.1.0"
 dependencies = [

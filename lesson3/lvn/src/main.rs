@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs, hash::Hash, io, path::PathBuf};
 
 use argh::FromArgs;
 use bril_rs::{ConstOps, Instruction, Literal, Program, Type, ValueOps};
-use build_cfg::{print::print_cfg_as_bril_text, BasicBlock};
+use build_cfg::{BasicBlock, print::print_cfg_as_bril_text};
 use snafu::{ResultExt, Whatever};
 
 /// does LVN

@@ -4,7 +4,10 @@ use std::{
 };
 
 use llvm_plugin::{
+    LlvmModulePass, ModuleAnalysisManager, PassBuilder, PipelineParsing,
+    PreservedAnalyses,
     inkwell::{
+        IntPredicate,
         basic_block::BasicBlock,
         builder::Builder,
         context::ContextRef,
@@ -14,12 +17,9 @@ use llvm_plugin::{
             ArrayValue, BasicValue, BasicValueEnum, FunctionValue, GlobalValue,
             InstructionOpcode, InstructionValue, IntValue, PointerValue,
         },
-        IntPredicate,
     },
-    LlvmModulePass, ModuleAnalysisManager, PassBuilder, PipelineParsing,
-    PreservedAnalyses,
 };
-use slotmap::{new_key_type, SecondaryMap, SlotMap};
+use slotmap::{SecondaryMap, SlotMap, new_key_type};
 
 #[llvm_plugin::plugin(name = "CustomPass", version = "0.1")]
 fn plugin_registrar(builder: &mut PassBuilder) {

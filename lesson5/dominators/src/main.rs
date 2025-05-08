@@ -7,12 +7,12 @@ use std::{
 
 use argh::FromArgs;
 use bril_rs::Program;
-use build_cfg::{slotmap::SecondaryMap, BasicBlockIdx, FunctionCfg};
+use build_cfg::{BasicBlockIdx, FunctionCfg, slotmap::SecondaryMap};
 use dominators::{
     compute_dominance_frontiers, compute_dominator_tree, compute_dominators,
 };
 use serde_json::json;
-use snafu::{whatever, ResultExt, Whatever};
+use snafu::{ResultExt, Whatever, whatever};
 
 enum Algorithm {
     Dominators,

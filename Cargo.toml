@@ -9,6 +9,7 @@ members = [
   "lesson5/dominators",
   "lesson6/ssa",
   "lesson7/llvm-pass",
+  "lesson8/loop-opt",
 ]
 
 [workspace.package]

@@ -11,7 +11,7 @@ use std::{
 
 use argh::FromArgs;
 use bril_rs::Program;
-use build_cfg::{build_cfg, print::print_cfg_as_bril_text, Exit};
+use build_cfg::{Exit, build_cfg, print::print_cfg_as_bril_text};
 use inform::{common::IndentWriterCommon, io::IndentWriter};
 use owo_colors::OwoColorize;
 use snafu::{ResultExt, Whatever};

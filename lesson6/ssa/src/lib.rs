@@ -3,10 +3,10 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use bril_rs::{EffectOps, Instruction, Type, ValueOps};
 use bril_util::InstructionExt;
 use build_cfg::{
-    slotmap::SecondaryMap, BasicBlock, BasicBlockIdx, Exit, FunctionCfg, Label,
-    LabeledExit,
+    BasicBlock, BasicBlockIdx, Exit, FunctionCfg, Label, LabeledExit,
+    slotmap::SecondaryMap,
 };
-use snafu::{whatever, OptionExt, Whatever};
+use snafu::{OptionExt, Whatever, whatever};
 
 pub fn insert_new_empty_entry_block(cfg: &mut FunctionCfg) {
     cfg.vertices[cfg.entry].is_entry = false;

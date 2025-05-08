@@ -25,11 +25,7 @@ pub fn print_cfg_as_bril_text(cfg: FunctionCfg) {
     // with a `.jmp` for example
     let blocks = iter::once(&cfg.vertices[cfg.entry]).chain(
         cfg.vertices.iter().filter_map(|(idx, block)| {
-            if idx == cfg.entry {
-                None
-            } else {
-                Some(block)
-            }
+            if idx == cfg.entry { None } else { Some(block) }
         }),
     );
     for block in blocks {

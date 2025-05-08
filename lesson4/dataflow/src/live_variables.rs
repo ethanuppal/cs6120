@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use bril_util::InstructionExt;
 use build_cfg::{BasicBlock, BasicBlockIdx, FunctionCfg};
 
-use crate::{solve_dataflow, Direction};
+use crate::{Direction, solve_dataflow};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Variable(String);

@@ -1,0 +1,14 @@
+[package]
+name = "loop-opt"
+version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+
+[dependencies]
+argh.workspace = true
+snafu.workspace = true
+bril-rs.workspace = true
+serde_json.workspace = true
+bril-util = { path = "../../lesson4/bril-util/" }
+build-cfg = { path = "../../lesson2/build-cfg" }
+dominators = { path = "../../lesson5/dominators/" }

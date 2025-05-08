@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, fs, io, path::PathBuf};
 use argh::FromArgs;
 use bril_rs::Program;
 use build_cfg::print;
-use snafu::{whatever, ResultExt, Whatever};
+use snafu::{ResultExt, Whatever, whatever};
 
 /// Transforms Bril into and out of SSA
 #[derive(FromArgs)]
