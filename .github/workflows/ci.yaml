@@ -283,3 +283,42 @@ jobs:
           just run_pass_and_code test_add.c
           just run_pass_and_code test_fib.c
           just run_pass_and_code test_sum.c
+
+  lesson8:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clone Bril
+        run: rm -rf bril && git clone https://github.com/sampsyo/bril && cd bril && git reset --hard bc60765c822852ab574fe8238d33dbe064a94943
+
+      - name: Sanity check
+        run: cargo build --package loop-opt
+
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+     
+      - name: Install brili
+        run: cd bril && deno install --global brili.ts 
+
+      - uses: actions/setup-python@v4
+        with:
+            python-version: '3.11'
+            cache: pip
+            cache-dependency-path: /bril/bril-txt/pyproject.toml
+
+      - name: Install Flit
+        run: pip install flit
+      - name: Install Python tools
+        run: cd bril/bril-txt ; flit install --symlink
+      - name: Install brench
+        run: cd bril/brench ; flit install --symlink
+
+      - name: Test loop optimization
+        run: |
+          cargo build --package loop-opt --bin loop-opt
+          cd lesson8
+          brench brench.toml ../bril/benchmarks/*/*.bril | python3 check_brench_loop.py --allow-slower

@@ -1,9 +1,9 @@
-use std::{collections::BTreeMap, fs, io, path::PathBuf};
+use std::{collections::BTreeSet, fs, io, path::PathBuf};
 
 use argh::FromArgs;
 use bril_rs::Program;
-use build_cfg::print;
-use snafu::{ResultExt, Whatever, whatever};
+use build_cfg::{print, BasicBlock, BasicBlockIdx, Label};
+use snafu::{ResultExt, Whatever};
 
 /// Performs loop optimization.
 #[derive(FromArgs)]
@@ -11,6 +11,12 @@ struct Opts {
     /// input Bril file: omit for stdin
     #[argh(positional)]
     input: Option<PathBuf>,
+}
+
+struct NaturalLoop {
+    header: BasicBlockIdx,
+    backedge_start: BasicBlockIdx,
+    body: BTreeSet<BasicBlockIdx>,
 }
 
 #[snafu::report]
@@ -34,6 +40,75 @@ fn main() -> Result<(), Whatever> {
     for function in program.functions {
         let mut cfg = build_cfg::build_cfg(&function, true)
             .whatever_context("Failed to build cfg")?;
+
+        let dominators = dominators::compute_dominators(&cfg);
+        let dominance_tree = dominators::compute_dominator_tree(&dominators);
+
+        let mut back_edges = vec![];
+        for start in cfg.vertices.keys() {
+            for end in cfg.successors(start) {
+                if dominance_tree[end].contains(&start) {
+                    back_edges.push((start, end));
+                }
+            }
+        }
+
+        let mut natural_loops = vec![];
+        for (start, end) in back_edges {
+            let mut natural_loop = BTreeSet::from_iter([end]);
+            let mut stack = vec![start];
+            while let Some(next) = stack.pop() {
+                if !natural_loop.contains(&next) {
+                    natural_loop.insert(next);
+                    stack.extend(cfg.predecessors(next));
+                }
+            }
+
+            // println!("new loop containing:");
+            // println!(
+            //     "* backedge {:?} -> {:?}",
+            //     cfg.vertices[start].label, cfg.vertices[end].label
+            // );
+            // print!("contents:");
+            // for block in &natural_loop {
+            //     print!(" {:?}", cfg.vertices[*block].label);
+            // }
+            // println!();
+
+            natural_loops.push(NaturalLoop {
+                header: end,
+                backedge_start: start,
+                body: natural_loop,
+            });
+        }
+
+        for NaturalLoop {
+            header,
+            backedge_start,
+            body,
+        } in natural_loops
+        {
+            let preheader = cfg.add_block(BasicBlock {
+                label: Some(Label {
+                    name: format!(
+                        "{}_preheader",
+                        cfg.vertices[header]
+                            .label
+                            .as_ref()
+                            .map(|label| label.name.clone())
+                            .unwrap_or_default()
+                    ),
+                }),
+                ..Default::default()
+            });
+            for header_predecessor in cfg.predecessors(header).to_vec() {
+                cfg.remove_edge(header_predecessor, header);
+                cfg.set_unconditional_edge(header_predecessor, preheader);
+            }
+            cfg.set_unconditional_edge(preheader, header);
+        }
+
+        print::print_cfg_as_bril_text(cfg);
     }
 
     Ok(())

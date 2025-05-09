@@ -7,8 +7,8 @@ use std::{collections::HashMap, mem};
 use bril_rs::{
     Argument, Code, EffectOps, Function, Instruction, Position, Type,
 };
-use slotmap::{Key, SecondaryMap, SlotMap, new_key_type};
-use snafu::{OptionExt, Whatever, whatever};
+use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
+use snafu::{whatever, OptionExt, Whatever};
 
 pub mod print;
 
@@ -32,7 +32,7 @@ impl BasicBlockIdx {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct BasicBlock {
     pub is_entry: bool,
     pub label: Option<Label>,
@@ -65,7 +65,7 @@ impl BasicBlock {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum LabeledExit {
     #[default]
     Fallthrough,
@@ -111,29 +111,101 @@ pub struct FunctionCfg {
 }
 
 impl FunctionCfg {
+    pub fn add_block(&mut self, block: BasicBlock) -> BasicBlockIdx {
+        self.vertices.insert(block)
+    }
+
     pub fn remove_edge(
         &mut self,
         start_block: BasicBlockIdx,
         end_block: BasicBlockIdx,
     ) {
-        self.vertices[start_block].exit = LabeledExit::Return(None);
-        self.edges.remove(start_block);
+        if matches!(
+            self.edges[start_block],
+            Exit::Return(_) | Exit::Fallthrough(_)
+        ) {
+            return;
+        }
+
+        let Some(end_label) = self.vertices[end_block].label.clone() else {
+            panic!("Destination block does not have a label");
+        };
+
         self.rev_edges[end_block]
             .retain(|predecessor| *predecessor != start_block);
+
+        match &self.vertices[start_block].exit {
+            LabeledExit::Unconditional { .. } => {
+                self.vertices[start_block].instructions.pop();
+                self.vertices[start_block]
+                .instructions
+                .push(Instruction::Effect {
+                    args: vec!["broken: missing exit (use FunctionCfg::add_unconditional_edge)".into()],
+                    funcs: vec![],
+                    labels: vec![],
+                    op: EffectOps::Nop,
+                    pos: None,
+                });
+                self.edges.remove(start_block);
+            }
+            LabeledExit::Conditional { .. } => {
+                self.vertices[start_block].instructions.pop();
+                self.vertices[start_block].instructions.push(
+                    Instruction::Effect {
+                        args: vec![],
+                        funcs: vec![],
+                        labels: vec![end_label.name],
+                        op: EffectOps::Jump,
+                        pos: None,
+                    },
+                );
+                self.edges[start_block] = Exit::Unconditional(end_block);
+            }
+            _ => {}
+        }
     }
 
-    pub fn add_unconditional_edge(
+    /// Overwrites an existing unconditional edge with the new one.
+    pub fn set_unconditional_edge(
         &mut self,
         start_block: BasicBlockIdx,
         end_block: BasicBlockIdx,
     ) {
-        if let Some(label) = self.vertices[end_block].label.clone() {
-            self.vertices[start_block].exit = LabeledExit::Unconditional {
-                label: label.name,
-                pos: None,
-            }
+        if !matches!(
+            self.vertices[start_block].exit,
+            LabeledExit::Fallthrough | LabeledExit::Unconditional { .. }
+        ) && self.edges.contains_key(start_block)
+        {
+            panic!(
+                "Was not already unconditional or absent: {:?}",
+                self.vertices[start_block]
+            );
         }
-        self.edges[start_block] = Exit::Unconditional(end_block);
+
+        let Some(end_label) = self.vertices[end_block].label.clone() else {
+            panic!("Destination block does not have a label");
+        };
+
+        self.vertices[start_block].exit = LabeledExit::Unconditional {
+            label: end_label.name.clone(),
+            pos: None,
+        };
+        self.vertices[start_block].instructions.pop();
+        self.vertices[start_block]
+            .instructions
+            .push(Instruction::Effect {
+                args: vec![],
+                funcs: vec![],
+                labels: vec![end_label.name],
+                op: EffectOps::Jump,
+                pos: None,
+            });
+
+        self.edges
+            .insert(start_block, Exit::Unconditional(end_block));
+        if !self.rev_edges.contains_key(end_block) {
+            self.rev_edges.insert(end_block, vec![]);
+        }
         if !self.rev_edges[end_block].contains(&start_block) {
             self.rev_edges[end_block].push(start_block);
         }
