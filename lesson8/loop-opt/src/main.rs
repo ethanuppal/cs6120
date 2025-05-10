@@ -283,6 +283,10 @@ fn main() -> Result<(), Whatever> {
             eprintln!("==== PART 2 ====");
 
             for (block, instructions) in loop_invariant {
+                if block == cfg.entry {
+                    continue;
+                }
+
                 let mut to_move = vec![];
                 for instruction_idx in instructions {
                     let mut use_blocks = vec![];
