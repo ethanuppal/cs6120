@@ -261,7 +261,7 @@ jobs:
           cargo build --package tdce --bin tdce
           cargo build --package ssa --bin ssa
           cd lesson6/ssa/bril_to_ssa_copied
-          brench brench.toml ../../../bril/benchmarks/*/*.bril | python3 check_brench_into_ssa.py --allow-slower
+          brench brench.toml ../../../bril/benchmarks/**/*.bril | python3 check_brench_into_ssa.py --allow-slower
   
   lesson7:
     runs-on: macos-15
@@ -321,4 +321,4 @@ jobs:
         run: |
           cargo build --package loop-opt --bin loop-opt
           cd lesson8
-          brench brench.toml ../bril/benchmarks/*/*.bril | python3 check_brench_loop.py --allow-slower
+          brench brench.toml ../bril/benchmarks/**/*.bril | python3 check_brench_loop.py --allow-slower

@@ -41,6 +41,8 @@ fn main() -> Result<(), Whatever> {
         let mut cfg = build_cfg::build_cfg(&function, true)
             .whatever_context("Failed to build cfg")?;
 
+        cfg.make_fallthroughs_explicit();
+
         let dominators = dominators::compute_dominators(&cfg);
         let dominance_tree = dominators::compute_dominator_tree(&dominators);
 
@@ -102,8 +104,7 @@ fn main() -> Result<(), Whatever> {
                 ..Default::default()
             });
             for header_predecessor in cfg.predecessors(header).to_vec() {
-                cfg.remove_edge(header_predecessor, header);
-                cfg.set_unconditional_edge(header_predecessor, preheader);
+                cfg.reorient_edge(header_predecessor, header, preheader);
             }
             cfg.set_unconditional_edge(preheader, header);
         }
