@@ -8,10 +8,10 @@ use argh::FromArgs;
 use bril_rs::{Instruction, Program};
 use bril_util::InstructionExt;
 use build_cfg::{
-    print, slotmap::SecondaryMap, BasicBlock, BasicBlockIdx, FunctionCfg, Label,
+    BasicBlock, BasicBlockIdx, FunctionCfg, Label, print, slotmap::SecondaryMap,
 };
 use dataflow::reaching_definitions::{
-    self, compute_reaching_definitions, Definition,
+    self, Definition, compute_reaching_definitions,
 };
 use snafu::{ResultExt, Whatever};
 

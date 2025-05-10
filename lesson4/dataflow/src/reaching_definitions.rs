@@ -2,10 +2,10 @@ use std::collections::{HashSet, VecDeque};
 
 use bril_util::{InstructionExt, InstructionValue};
 use build_cfg::{
-    slotmap::SecondaryMap, BasicBlock, BasicBlockIdx, FunctionCfg,
+    BasicBlock, BasicBlockIdx, FunctionCfg, slotmap::SecondaryMap,
 };
 
-use crate::{solve_dataflow, Direction};
+use crate::{Direction, solve_dataflow};
 
 /// (`definition`, `value`, `basic_block`, `index_in_block`).
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
