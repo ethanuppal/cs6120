@@ -326,6 +326,10 @@ fn main() -> Result<(), Whatever> {
                     ) && dominates_uses(block, &use_blocks, &dominators)
                         && dominates_exits(block, &exit_blocks, &dominators)
                     {
+                        eprintln!(
+                            "moving {:?}",
+                            cfg.vertices[block].instructions[instruction_idx],
+                        );
                         to_move.push(instruction_idx);
                     }
                 }
@@ -333,11 +337,7 @@ fn main() -> Result<(), Whatever> {
                 while let Some(to_move) = to_move.pop() {
                     let instruction =
                         cfg.vertices[block].instructions.remove(to_move);
-                    let insertion_point =
-                        cfg.vertices[preheader].instructions.len() - 1;
-                    cfg.vertices[preheader]
-                        .instructions
-                        .insert(insertion_point, instruction);
+                    cfg.vertices[preheader].instructions.insert(0, instruction);
                 }
             }
 
