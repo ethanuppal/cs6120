@@ -12,3 +12,4 @@ serde_json.workspace = true
 build-cfg = { path = "../../lesson2/build-cfg" }
 dominators = { path = "../../lesson5/dominators/" }
 dataflow = { path = "../../lesson4/dataflow" }
+bril-util = { path = "../../lesson4/bril-util/" }

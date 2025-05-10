@@ -2,13 +2,19 @@ use std::collections::{HashSet, VecDeque};
 
 use bril_util::{InstructionExt, InstructionValue};
 use build_cfg::{
-    BasicBlock, BasicBlockIdx, FunctionCfg, slotmap::SecondaryMap,
+    slotmap::SecondaryMap, BasicBlock, BasicBlockIdx, FunctionCfg,
 };
 
-use crate::{Direction, solve_dataflow};
+use crate::{solve_dataflow, Direction};
 
-#[derive(PartialEq, Eq, Hash, Clone)]
-pub struct Definition(pub String, pub InstructionValue, pub BasicBlockIdx);
+/// (`definition`, `value`, `basic_block`, `index_in_block`).
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Definition(
+    pub String,
+    pub InstructionValue,
+    pub BasicBlockIdx,
+    pub isize,
+);
 
 /// Whether `definition` is reachable backward from `block`.
 pub fn definition_is_reachable(
@@ -27,12 +33,14 @@ pub fn definition_is_reachable(
         if cfg.vertices[current]
             .instructions
             .iter()
+            .enumerate()
             .rev()
-            .any(|instruction| {
+            .any(|(i, instruction)| {
                 if let (Some(kill), Some(value)) =
                     (instruction.kill(), instruction.value())
                 {
-                    definition == &Definition(kill.clone(), value, current)
+                    definition
+                        == &Definition(kill.clone(), value, current, i as isize)
                 } else {
                     false
                 }
@@ -59,13 +67,14 @@ pub fn compute_reaching_definitions(
         block_idx: BasicBlockIdx,
         mut inputs: HashSet<Definition>,
     ) -> HashSet<Definition> {
-        for instruction in &block.instructions {
+        for (i, instruction) in block.instructions.iter().enumerate() {
             if let Some(kill) = instruction.kill() {
                 inputs.retain(|input| &input.0 != kill);
                 inputs.insert(Definition(
                     kill.clone(),
                     instruction.value().expect("kill without value somehow"),
                     block_idx,
+                    i as isize,
                 ));
             }
         }
@@ -83,6 +92,7 @@ pub fn compute_reaching_definitions(
                     argument.name.clone(),
                     InstructionValue::Argument,
                     cfg.entry,
+                    -1,
                 )
             })
             .collect(),

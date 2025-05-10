@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use build_cfg::{BasicBlockIdx, FunctionCfg, slotmap::SecondaryMap};
+use build_cfg::{slotmap::SecondaryMap, BasicBlockIdx, FunctionCfg};
 use dataflow::construct_postorder;
 
 pub fn compute_dominators(
