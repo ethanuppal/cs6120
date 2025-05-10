@@ -11,3 +11,11 @@ pipeline = [
   "bril2json",
   "brili -p {args}",
 ]
+
+[runs.licm]
+pipeline = [
+  "bril2json",
+  "../target/debug/loop-opt --stage 1",
+  "bril2json",
+  "brili -p {args}",
+]

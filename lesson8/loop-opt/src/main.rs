@@ -2,12 +2,14 @@ use std::{collections::BTreeSet, fs, io, path::PathBuf};
 
 use argh::FromArgs;
 use bril_rs::Program;
-use build_cfg::{print, BasicBlock, BasicBlockIdx, Label};
+use build_cfg::{BasicBlock, BasicBlockIdx, Label, print};
+use dataflow::reaching_definitions::{self, compute_reaching_definitions};
 use snafu::{ResultExt, Whatever};
 
 #[repr(u32)]
 enum Stage {
     InsertPreheader,
+    LoopInvariantCodeMotion,
 }
 
 /// Performs loop optimization.
@@ -23,6 +25,13 @@ struct Opts {
 }
 
 struct NaturalLoop {
+    header: BasicBlockIdx,
+    backedge_start: BasicBlockIdx,
+    body: BTreeSet<BasicBlockIdx>,
+}
+
+struct NaturalLoopWithPreheader {
+    preheader: BasicBlockIdx,
     header: BasicBlockIdx,
     backedge_start: BasicBlockIdx,
     body: BTreeSet<BasicBlockIdx>,
@@ -93,6 +102,7 @@ fn main() -> Result<(), Whatever> {
             });
         }
 
+        let mut natural_loops_with_preheaders = vec![];
         for NaturalLoop {
             header,
             backedge_start,
@@ -116,9 +126,31 @@ fn main() -> Result<(), Whatever> {
                 cfg.reorient_edge(header_predecessor, header, preheader);
             }
             cfg.set_unconditional_edge(preheader, header);
+
+            natural_loops_with_preheaders.push(NaturalLoopWithPreheader {
+                preheader,
+                header,
+                backedge_start,
+                body,
+            });
         }
 
         if opts.stage == Stage::InsertPreheader as u32 {
+            print::print_cfg_as_bril_text(cfg);
+            continue;
+        }
+
+        for NaturalLoopWithPreheader {
+            preheader,
+            header,
+            backedge_start,
+            body,
+        } in natural_loops_with_preheaders
+        {
+            let reaching_definitions = compute_reaching_definitions(&cfg);
+        }
+
+        if opts.stage == Stage::LoopInvariantCodeMotion as u32 {
             print::print_cfg_as_bril_text(cfg);
             continue;
         }

@@ -1,7 +1,9 @@
 use std::collections::{HashSet, VecDeque};
 
 use bril_util::{InstructionExt, InstructionValue};
-use build_cfg::{BasicBlock, BasicBlockIdx, FunctionCfg};
+use build_cfg::{
+    BasicBlock, BasicBlockIdx, FunctionCfg, slotmap::SecondaryMap,
+};
 
 use crate::{Direction, solve_dataflow};
 
@@ -9,7 +11,7 @@ use crate::{Direction, solve_dataflow};
 pub struct Definition(pub String, pub InstructionValue, pub BasicBlockIdx);
 
 /// Whether `definition` is reachable backward from `block`.
-fn definition_is_reachable(
+pub fn definition_is_reachable(
     cfg: &FunctionCfg,
     block: BasicBlockIdx,
     definition: &Definition,
@@ -49,7 +51,9 @@ fn definition_is_reachable(
     false
 }
 
-pub fn reaching_definitions(cfg: &FunctionCfg) {
+pub fn compute_reaching_definitions(
+    cfg: &FunctionCfg,
+) -> SecondaryMap<BasicBlockIdx, HashSet<Definition>> {
     fn transfer(
         block: &BasicBlock,
         block_idx: BasicBlockIdx,
@@ -67,8 +71,8 @@ pub fn reaching_definitions(cfg: &FunctionCfg) {
         }
         inputs
     }
-    println!("@{} {{", cfg.signature.name);
-    for (block, solution) in solve_dataflow(
+
+    solve_dataflow(
         cfg,
         Direction::Forward,
         cfg.signature
@@ -84,29 +88,5 @@ pub fn reaching_definitions(cfg: &FunctionCfg) {
             .collect(),
         |lhs, rhs| lhs.union(rhs).cloned().collect(),
         transfer,
-    ) {
-        if let Some(label) = &cfg.vertices[block].label {
-            println!("  .{}", label.name);
-        }
-        let mut printouts = solution
-            .iter()
-            .map(|definition| {
-                format!("    {} = {:?}", definition.0, definition.1)
-            })
-            .collect::<Vec<_>>();
-        printouts.sort();
-        for printout in printouts {
-            println!("{}", printout);
-        }
-
-        for definition in solution {
-            if !definition_is_reachable(cfg, block, &definition) {
-                panic!(
-                    "No reachable definition found for {:?} = {:?}",
-                    definition.0, definition.1
-                );
-            }
-        }
-    }
-    println!("}}");
+    )
 }

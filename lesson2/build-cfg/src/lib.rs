@@ -7,8 +7,8 @@ use std::{collections::HashMap, mem};
 use bril_rs::{
     Argument, Code, EffectOps, Function, Instruction, Position, Type,
 };
-use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
-use snafu::{whatever, OptionExt, Whatever};
+use slotmap::{Key, SecondaryMap, SlotMap, new_key_type};
+use snafu::{OptionExt, Whatever, whatever};
 
 pub mod print;
 

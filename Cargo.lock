@@ -263,8 +263,8 @@ version = "0.1.0"
 dependencies = [
  "argh",
  "bril-rs",
- "bril-util",
  "build-cfg",
+ "dataflow",
  "dominators",
  "serde_json",
  "snafu",
