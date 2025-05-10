@@ -5,12 +5,21 @@ use bril_rs::Program;
 use build_cfg::{print, BasicBlock, BasicBlockIdx, Label};
 use snafu::{ResultExt, Whatever};
 
+#[repr(u32)]
+enum Stage {
+    InsertPreheader,
+}
+
 /// Performs loop optimization.
 #[derive(FromArgs)]
 struct Opts {
     /// input Bril file: omit for stdin
     #[argh(positional)]
     input: Option<PathBuf>,
+
+    /// stage: 0 = insert preheader
+    #[argh(option, default = "0")]
+    stage: u32,
 }
 
 struct NaturalLoop {
@@ -109,7 +118,10 @@ fn main() -> Result<(), Whatever> {
             cfg.set_unconditional_edge(preheader, header);
         }
 
-        print::print_cfg_as_bril_text(cfg);
+        if opts.stage == Stage::InsertPreheader as u32 {
+            print::print_cfg_as_bril_text(cfg);
+            continue;
+        }
     }
 
     Ok(())

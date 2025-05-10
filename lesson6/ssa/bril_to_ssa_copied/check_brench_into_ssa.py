@@ -32,16 +32,16 @@ for i in range(1, len(rows), 4):
         print(f"\x1b[31m{baseline[0]} INCORRECT\x1b[m")
         sys.exit(1)
     elif (
-        ssa[2] == "incorrect"
-        or through_ssa[2] == "incorrect"
-        or tdce_ssa == "incorrect"
+        ssa[2] == "timeout"
+        or through_ssa[2] == "timeout"
+        or tdce_ssa == "timeout"
     ):
         print(f"\x1b[31m{baseline[0]} TIMED OUT\x1b[m")
         sys.exit(1)
     elif (
-        ssa[2] == "incorrect"
-        or through_ssa[2] == "incorrect"
-        or tdce_ssa == "incorrect"
+        ssa[2] == "missing"
+        or through_ssa[2] == "missing"
+        or tdce_ssa == "missing"
     ):
         print(f"\x1b[31m{baseline[0]} MISSING\x1b[m")
         sys.exit(1)

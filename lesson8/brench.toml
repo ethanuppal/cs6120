@@ -4,10 +4,10 @@ timeout = 200
 [runs.baseline]
 pipeline = ["bril2json", "brili -p {args}"]
 
-[runs.loop-opt]
+[runs.insert-preheader]
 pipeline = [
   "bril2json",
-  "../target/debug/loop-opt",
+  "../target/debug/loop-opt --stage 0",
   "bril2json",
   "brili -p {args}",
 ]

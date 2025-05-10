@@ -20,24 +20,27 @@ def check_did_optimize(baseline, new, name):
 
 for i in range(1, len(rows), 2):
     baseline = rows[i]
-    loop = rows[i + 1]
+    insert_preheader = rows[i + 1]
 
-    if loop[2] == "incorrect":
+    if insert_preheader[2] == "incorrect":
         print(f"\x1b[31m{baseline[0]} INCORRECT\x1b[m")
         sys.exit(1)
-    elif loop[2] == "missing":
+    elif insert_preheader[2] == "timeout":
+        print(f"\x1b[31m{baseline[0]} TIMED OUT\x1b[m")
+        sys.exit(1)
+    elif insert_preheader[2] == "missing":
         print(f"\x1b[31m{baseline[0]} MISSING\x1b[m")
         sys.exit(1)
 
     baseline_time = int(baseline[2])
-    loop_time = int(loop[2])
+    loop_time = int(insert_preheader[2])
 
     print(f"{baseline[0]}")
-    check_did_optimize(baseline_time, loop_time, "loop-opt")
+    check_did_optimize(baseline_time, loop_time, "insert-preheader")
     times_scored = sorted(
         [
             (baseline_time, "baseline"),
-            (loop_time, "loop-opt"),
+            (loop_time, "insert-preheader"),
         ]
     )
     print(f"  (times in order: {times_scored})")
