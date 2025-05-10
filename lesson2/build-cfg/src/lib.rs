@@ -7,8 +7,8 @@ use std::{collections::HashMap, mem};
 use bril_rs::{
     Argument, Code, EffectOps, Function, Instruction, Position, Type,
 };
-use slotmap::{Key, SecondaryMap, SlotMap, new_key_type};
-use snafu::{OptionExt, Whatever, whatever};
+use slotmap::{new_key_type, Key, SecondaryMap, SlotMap};
+use snafu::{whatever, OptionExt, Whatever};
 
 pub mod print;
 
@@ -335,6 +335,37 @@ impl FunctionCfg {
         }
 
         self.assert_no_fallthroughs();
+    }
+
+    /// Converts unconditional branches to fallthroughs where possible.
+    pub fn simplify_unconditionals_to_fallthroughs(&mut self) {
+        let blocks = self.vertices.keys().collect::<Vec<_>>();
+
+        for (current, next) in blocks
+            .iter()
+            .zip(blocks.iter().skip(1))
+            .map(|(a, b)| (*a, *b))
+        {
+            if let Exit::Unconditional(current_destination) =
+                self.edges[current]
+            {
+                if current_destination == next {
+                    let label = &self.vertices[next]
+                        .label
+                        .as_ref()
+                        .expect("all but entry must have labels")
+                        .name;
+
+                    self.vertices[current].exit = LabeledExit::Unconditional {
+                        label: label.clone(),
+                        pos: None,
+                    };
+
+                    self.vertices[current].instructions.pop();
+                    self.edges[current] = Exit::Fallthrough(Some(next));
+                }
+            }
+        }
     }
 
     /// Asserts that this CFG has no fallthrough edges.

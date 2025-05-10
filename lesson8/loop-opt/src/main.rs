@@ -350,6 +350,8 @@ fn main() -> Result<(), Whatever> {
             cfg.reorient_edge(backedge_start, preheader, header);
         }
 
+        cfg.simplify_unconditionals_to_fallthroughs();
+
         if opts.stage == Stage::LoopInvariantCodeMotion as u32 {
             print::print_cfg_as_bril_text(cfg);
             continue;
