@@ -32,7 +32,7 @@ impl BasicBlockIdx {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct BasicBlock {
     pub is_entry: bool,
     pub label: Option<Label>,
@@ -65,7 +65,7 @@ impl BasicBlock {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum LabeledExit {
     #[default]
     Fallthrough,
@@ -111,29 +111,161 @@ pub struct FunctionCfg {
 }
 
 impl FunctionCfg {
-    pub fn remove_edge(
-        &mut self,
-        start_block: BasicBlockIdx,
-        end_block: BasicBlockIdx,
-    ) {
-        self.vertices[start_block].exit = LabeledExit::Return(None);
-        self.edges.remove(start_block);
-        self.rev_edges[end_block]
-            .retain(|predecessor| *predecessor != start_block);
+    pub fn add_block(&mut self, block: BasicBlock) -> BasicBlockIdx {
+        self.vertices.insert(block)
     }
 
-    pub fn add_unconditional_edge(
+    /// Replaces a `(start_block, old_end_block)` edge with `(start_block,
+    /// end_block)` edge.
+    ///
+    /// Requires: there are no fallthrough edges.
+    pub fn reorient_edge(
+        &mut self,
+        start_block: BasicBlockIdx,
+        old_end_block: BasicBlockIdx,
+        end_block: BasicBlockIdx,
+    ) {
+        if matches!(self.edges[start_block], Exit::Return(_)) {
+            return;
+        }
+
+        let Some(end_label) = self.vertices[end_block].label.clone() else {
+            panic!("Destination block does not have a label");
+        };
+
+        self.rev_edges[old_end_block]
+            .retain(|predecessor| *predecessor != start_block);
+
+        let new_end_rev_edges =
+            self.rev_edges.entry(end_block).unwrap().or_default();
+        if !new_end_rev_edges.contains(&start_block) {
+            new_end_rev_edges.push(start_block);
+        }
+
+        match &self.vertices[start_block].exit {
+            LabeledExit::Unconditional { .. } => {
+                *self.vertices[start_block]
+                    .instructions
+                    .last_mut()
+                    .expect("Call FunctionCfg::make_fallthroughs_explicit") =
+                    Instruction::Effect {
+                        args: vec![],
+                        funcs: vec![],
+                        labels: vec![end_label.name],
+                        op: EffectOps::Jump,
+                        pos: None,
+                    };
+                self.edges[start_block] = Exit::Unconditional(end_block);
+            }
+            LabeledExit::Conditional {
+                if_true_label,
+                if_false_label,
+                ..
+            } => {
+                let Exit::Conditional {
+                    if_true,
+                    if_false,
+                    condition,
+                } = self.edges[start_block].clone()
+                else {
+                    unreachable!(
+                        "LabeledExit should always correspond with Exit"
+                    );
+                };
+                let (
+                    new_if_true_label,
+                    new_if_false_label,
+                    new_if_true,
+                    new_if_false,
+                ) = if old_end_block == if_true {
+                    (
+                        end_label.name,
+                        if_false_label.clone(),
+                        end_block,
+                        if_false,
+                    )
+                } else {
+                    (if_true_label.clone(), end_label.name, if_true, end_block)
+                };
+                *self.vertices[start_block]
+                    .instructions
+                    .last_mut()
+                    .expect("Call FunctionCfg::make_fallthroughs_explicit") =
+                    Instruction::Effect {
+                        args: vec![condition.clone()],
+                        funcs: vec![],
+                        labels: vec![new_if_true_label, new_if_false_label],
+                        op: EffectOps::Branch,
+                        pos: None,
+                    };
+                self.edges[start_block] = Exit::Conditional {
+                    condition,
+                    if_true: new_if_true,
+                    if_false: new_if_false,
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Overwrites an existing unconditional edge with the new one.
+    ///
+    /// Requires: there are no fallthrough edges.
+    pub fn set_unconditional_edge(
         &mut self,
         start_block: BasicBlockIdx,
         end_block: BasicBlockIdx,
     ) {
-        if let Some(label) = self.vertices[end_block].label.clone() {
-            self.vertices[start_block].exit = LabeledExit::Unconditional {
-                label: label.name,
-                pos: None,
-            }
+        if !matches!(
+            self.vertices[start_block].exit,
+            LabeledExit::Fallthrough | LabeledExit::Unconditional { .. }
+        ) && self.edges.contains_key(start_block)
+        {
+            panic!(
+                "Was not already unconditional or absent: {:?}",
+                self.vertices[start_block]
+            );
         }
-        self.edges[start_block] = Exit::Unconditional(end_block);
+
+        let Some(end_label) = self.vertices[end_block].label.clone() else {
+            panic!("Destination block does not have a label");
+        };
+
+        match &self.vertices[start_block].exit {
+            LabeledExit::Fallthrough => {
+                self.vertices[start_block].instructions.push(
+                    Instruction::Effect {
+                        args: vec![],
+                        funcs: vec![],
+                        labels: vec![end_label.name.clone()],
+                        op: EffectOps::Jump,
+                        pos: None,
+                    },
+                );
+            }
+            LabeledExit::Unconditional { .. } => {
+                *self.vertices[start_block].instructions.last_mut().expect("branching LabeledExit implies existence of corresponding instruction at end of block") =
+                    Instruction::Effect {
+                        args: vec![],
+                        funcs: vec![],
+                        labels: vec![end_label.name.clone()],
+                        op: EffectOps::Jump,
+                        pos: None,
+                    };
+            }
+            _ => unreachable!(),
+        }
+
+        self.vertices[start_block].exit = LabeledExit::Unconditional {
+            label: end_label.name,
+            pos: None,
+        };
+
+        self.edges
+            .insert(start_block, Exit::Unconditional(end_block));
+        if !self.rev_edges.contains_key(end_block) {
+            self.rev_edges.insert(end_block, vec![]);
+        }
         if !self.rev_edges[end_block].contains(&start_block) {
             self.rev_edges[end_block].push(start_block);
         }
@@ -158,6 +290,95 @@ impl FunctionCfg {
         self.rev_edges
             .get(block)
             .map_or(&[] as &[BasicBlockIdx], |edges| edges.as_slice())
+    }
+
+    /// Replaces al fallthroughs with unconditional jumps or returns.
+    pub fn make_fallthroughs_explicit(&mut self) {
+        for block_idx in self.vertices.keys().collect::<Vec<_>>() {
+            if let Exit::Fallthrough(destination) = self.edges[block_idx] {
+                if let Some(destination) = destination {
+                    let Some(label) = self.vertices[destination].label.clone()
+                    else {
+                        unreachable!(
+                            "cannot fallthrough to block without label since only the entry has no label"
+                        );
+                    };
+                    self.vertices[block_idx].exit =
+                        LabeledExit::Unconditional {
+                            label: label.name.clone(),
+                            pos: None,
+                        };
+                    self.edges[block_idx] = Exit::Unconditional(destination);
+                    self.vertices[block_idx].instructions.push(
+                        Instruction::Effect {
+                            args: vec![],
+                            funcs: vec![],
+                            labels: vec![label.name],
+                            op: EffectOps::Jump,
+                            pos: None,
+                        },
+                    );
+                } else {
+                    self.vertices[block_idx].exit = LabeledExit::Return(None);
+                    self.edges[block_idx] = Exit::Return(None);
+                    self.vertices[block_idx].instructions.push(
+                        Instruction::Effect {
+                            args: vec![],
+                            funcs: vec![],
+                            labels: vec![],
+                            op: EffectOps::Return,
+                            pos: None,
+                        },
+                    );
+                }
+            }
+        }
+
+        self.assert_no_fallthroughs();
+    }
+
+    /// Converts unconditional branches to fallthroughs where possible.
+    pub fn simplify_unconditionals_to_fallthroughs(&mut self) {
+        let blocks = self.vertices.keys().collect::<Vec<_>>();
+
+        for (current, next) in blocks
+            .iter()
+            .zip(blocks.iter().skip(1))
+            .map(|(a, b)| (*a, *b))
+        {
+            if let Exit::Unconditional(current_destination) =
+                self.edges[current]
+            {
+                if current_destination == next {
+                    let label = &self.vertices[next]
+                        .label
+                        .as_ref()
+                        .expect("all but entry must have labels")
+                        .name;
+
+                    self.vertices[current].exit = LabeledExit::Unconditional {
+                        label: label.clone(),
+                        pos: None,
+                    };
+
+                    self.vertices[current].instructions.pop();
+                    self.edges[current] = Exit::Fallthrough(Some(next));
+                }
+            }
+        }
+    }
+
+    /// Asserts that this CFG has no fallthrough edges.
+    pub fn assert_no_fallthroughs(&self) {
+        for block_idx in self.vertices.keys() {
+            assert!(!matches!(
+                self.vertices[block_idx].exit,
+                LabeledExit::Fallthrough
+            ));
+            if self.edges.contains_key(block_idx) {
+                assert!(!matches!(self.edges[block_idx], Exit::Fallthrough(_)));
+            }
+        }
     }
 }
 

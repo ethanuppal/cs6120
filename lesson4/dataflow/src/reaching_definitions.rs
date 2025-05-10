@@ -1,15 +1,23 @@
 use std::collections::{HashSet, VecDeque};
 
 use bril_util::{InstructionExt, InstructionValue};
-use build_cfg::{BasicBlock, BasicBlockIdx, FunctionCfg};
+use build_cfg::{
+    BasicBlock, BasicBlockIdx, FunctionCfg, slotmap::SecondaryMap,
+};
 
 use crate::{Direction, solve_dataflow};
 
-#[derive(PartialEq, Eq, Hash, Clone)]
-pub struct Definition(pub String, pub InstructionValue, pub BasicBlockIdx);
+/// (`definition`, `value`, `basic_block`, `index_in_block`).
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Definition(
+    pub String,
+    pub InstructionValue,
+    pub BasicBlockIdx,
+    pub isize,
+);
 
 /// Whether `definition` is reachable backward from `block`.
-fn definition_is_reachable(
+pub fn definition_is_reachable(
     cfg: &FunctionCfg,
     block: BasicBlockIdx,
     definition: &Definition,
@@ -25,12 +33,14 @@ fn definition_is_reachable(
         if cfg.vertices[current]
             .instructions
             .iter()
+            .enumerate()
             .rev()
-            .any(|instruction| {
+            .any(|(i, instruction)| {
                 if let (Some(kill), Some(value)) =
                     (instruction.kill(), instruction.value())
                 {
-                    definition == &Definition(kill.clone(), value, current)
+                    definition
+                        == &Definition(kill.clone(), value, current, i as isize)
                 } else {
                     false
                 }
@@ -49,26 +59,29 @@ fn definition_is_reachable(
     false
 }
 
-pub fn reaching_definitions(cfg: &FunctionCfg) {
+pub fn compute_reaching_definitions(
+    cfg: &FunctionCfg,
+) -> SecondaryMap<BasicBlockIdx, HashSet<Definition>> {
     fn transfer(
         block: &BasicBlock,
         block_idx: BasicBlockIdx,
         mut inputs: HashSet<Definition>,
     ) -> HashSet<Definition> {
-        for instruction in &block.instructions {
+        for (i, instruction) in block.instructions.iter().enumerate() {
             if let Some(kill) = instruction.kill() {
                 inputs.retain(|input| &input.0 != kill);
                 inputs.insert(Definition(
                     kill.clone(),
                     instruction.value().expect("kill without value somehow"),
                     block_idx,
+                    i as isize,
                 ));
             }
         }
         inputs
     }
-    println!("@{} {{", cfg.signature.name);
-    for (block, solution) in solve_dataflow(
+
+    solve_dataflow(
         cfg,
         Direction::Forward,
         cfg.signature
@@ -79,34 +92,11 @@ pub fn reaching_definitions(cfg: &FunctionCfg) {
                     argument.name.clone(),
                     InstructionValue::Argument,
                     cfg.entry,
+                    -1,
                 )
             })
             .collect(),
         |lhs, rhs| lhs.union(rhs).cloned().collect(),
         transfer,
-    ) {
-        if let Some(label) = &cfg.vertices[block].label {
-            println!("  .{}", label.name);
-        }
-        let mut printouts = solution
-            .iter()
-            .map(|definition| {
-                format!("    {} = {:?}", definition.0, definition.1)
-            })
-            .collect::<Vec<_>>();
-        printouts.sort();
-        for printout in printouts {
-            println!("{}", printout);
-        }
-
-        for definition in solution {
-            if !definition_is_reachable(cfg, block, &definition) {
-                panic!(
-                    "No reachable definition found for {:?} = {:?}",
-                    definition.0, definition.1
-                );
-            }
-        }
-    }
-    println!("}}");
+    )
 }

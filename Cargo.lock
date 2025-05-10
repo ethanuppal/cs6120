@@ -265,6 +265,7 @@ dependencies = [
  "bril-rs",
  "bril-util",
  "build-cfg",
+ "dataflow",
  "dominators",
  "serde_json",
  "snafu",
